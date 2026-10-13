@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kinetic Twin: Conversational 3D Digital Twin WMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#D7D8D2;--surface:#F4F4F1;--surface2:#EAEBE6;--ink:#1C2730;--muted:#56626C;--line:#BFC2BA;
+  --tape:#E2A800;--alert:#C2412B;--ok:#2F7D62;--warn:#B98100;--accent:#1C2730;--accent-ink:#F4F4F1;
+  --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#151B20;--surface:#1F262C;--surface2:#262E35;--ink:#E4E6E1;--muted:#9AA5AD;--line:#36414A;
+  --tape:#F2C230;--alert:#E8705A;--ok:#4FB38E;--warn:#F2C230;--accent:#E4E6E1;--accent-ink:#151B20;}}
+:root[data-theme="dark"]{
+  --bg:#151B20;--surface:#1F262C;--surface2:#262E35;--ink:#E4E6E1;--muted:#9AA5AD;--line:#36414A;
+  --tape:#F2C230;--alert:#E8705A;--ok:#4FB38E;--warn:#F2C230;--accent:#E4E6E1;--accent-ink:#151B20;}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+.tapebar{height:8px;background:repeating-linear-gradient(-45deg,var(--tape) 0 14px,var(--ink) 14px 28px)}
+header.top{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:14px 22px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.01em;line-height:1}
+.brand small{display:block;font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted);letter-spacing:0;margin-top:3px}
+.tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:8px;margin-left:auto}
+.tabs button{border:0;background:transparent;padding:7px 16px;border-radius:6px;font-weight:500;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+.clock{font-family:var(--display);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums}
+.clock span{font-family:var(--body);font-size:12px;color:var(--muted);font-weight:400;margin-left:6px}
+main{max-width:1560px;margin:0 auto;padding:18px}
+.twin-grid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;align-items:start}
+@media (max-width:1080px){.twin-grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:5px 11px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.ctl-label{font-size:13px;color:var(--muted)}
+.inject{border:1px solid var(--line);background:var(--surface2);border-radius:7px;padding:5px 11px;font-size:13px}
+.inject:hover{border-color:var(--tape)}
+.inject[data-on="true"]{border-color:var(--alert);color:var(--alert)}
+.spacer{flex:1}
+.stage{position:relative;height:clamp(420px,60vh,660px);overflow:hidden;background:#0b1016}
+#scene3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#scene3d.dragging{cursor:grabbing}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;background:rgba(28,39,48,.9);color:#F4F4F1;border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.lbl i{width:8px;height:8px;border-radius:2px;background:#7AA6E6;display:inline-block}
+.lbl.ok i{background:#4FB38E}.lbl.bad i{background:#E8705A}.lbl.warn i{background:#F2C230}
+.lbl.hl{border-color:#F2C230;box-shadow:0 0 0 2px #F2C230}
+.lbl.sel{border-color:#7AA6E6;box-shadow:0 0 0 2px #7AA6E6}
+.lbl span{font-weight:400;color:#C6CDD3}
+.lbl.door{background:#1C2730;border:0;padding:1px 5px;font-family:var(--display);font-size:13px;letter-spacing:.02em;transform:translate(-50%,-50%);border-radius:3px}
+.lbl.door.closed{opacity:.5}
+.viewctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:2px;background:rgba(28,39,48,.88);border-radius:9px;padding:4px}
+.viewctl button{width:34px;height:34px;border:0;background:transparent;border-radius:6px;display:grid;place-items:center;color:#E4E6E1}
+.viewctl button:hover,.viewctl button[aria-pressed="true"]{background:rgba(255,255,255,.12)}
+.viewctl svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hint3d{position:absolute;left:10px;bottom:8px;font-size:11.5px;color:#E4E6E1;background:rgba(28,39,48,.7);padding:3px 8px;border-radius:5px;pointer-events:none}
+.nogl{position:absolute;inset:0;display:grid;place-items:center;color:#E4E6E1;text-align:center;padding:30px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border-top:1px solid var(--line)}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.kpi{padding:10px 12px;border-right:1px solid var(--line)}
+.kpi:last-child{border-right:0}
+.kpi b{display:block;font-family:var(--display);font-size:26px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--muted)}
+.kpi.warn b{color:var(--alert)}
+.log{max-height:170px;overflow:auto;padding:6px 12px 10px;border-top:1px solid var(--line);font-size:13px}
+.log h3,.copilot h3{font-family:var(--display);font-weight:600;font-size:18px;margin:6px 0 4px}
+.log ol{list-style:none;margin:0;padding:0}
+.log li{display:flex;gap:10px;padding:2px 0;color:var(--muted)}
+.log li time{font-variant-numeric:tabular-nums;color:var(--ink);min-width:38px}
+.log li.bad span{color:var(--alert)} .log li.ok span{color:var(--ok)} .log li.ai span{color:var(--ink);font-weight:500}
+.copilot{display:flex;flex-direction:column;height:min(900px,calc(100vh - 120px));min-height:600px;position:sticky;top:12px}
+@media (max-width:1080px){.copilot{position:static;height:auto}}
+.cp-head{padding:12px 14px;border-bottom:1px solid var(--line)}
+.cp-head p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.cp-src{font-size:12px;color:var(--muted)}
+.watch{padding:8px 14px 10px;border-bottom:1px solid var(--line)}
+.watch ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.watch li button{width:100%;text-align:left;background:var(--surface2);border:1px solid var(--line);border-left:4px solid var(--tape);border-radius:6px;padding:7px 10px;font-size:13px}
+.watch li button.s3{border-left-color:var(--alert)}
+.watch li button strong{display:block;font-weight:600}
+.watch li button span{color:var(--muted)}
+.watch .empty{font-size:13px;color:var(--muted)}
+.chat{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px;min-height:220px}
+.msg{max-width:94%;font-size:14px}
+.msg.user{align-self:flex-end;background:var(--ink);color:var(--surface);padding:8px 12px;border-radius:12px 12px 2px 12px}
+.msg.ai{align-self:flex-start;background:var(--surface2);padding:10px 12px;border-radius:12px 12px 12px 2px;border:1px solid var(--line)}
+.msg.ai p{margin:0 0 6px} .msg.ai p:last-child{margin-bottom:0}
+.msg.ai ul{margin:4px 0 6px;padding-left:18px}
+.msg .meta{font-size:11px;color:var(--muted);margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.msg .acts{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.msg .acts button{text-align:left;border:1px solid var(--ink);background:var(--surface);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:500}
+.msg .acts button:hover{background:var(--tape);border-color:var(--tape);color:#1C2730}
+.msg .acts button[disabled]{opacity:.6;cursor:default;background:transparent;border-style:dashed}
+.linkbtn{border:0;background:none;padding:0;text-decoration:underline;color:var(--ink);font-size:11px}
+.thinking{color:var(--muted);font-style:italic}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px 0}
+.chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px}
+.chips button:hover{border-color:var(--tape)}
+form.ask{display:flex;gap:8px;padding:10px 14px 14px}
+form.ask input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit;font-size:14px}
+form.ask button{border:0;background:var(--ink);color:var(--surface);border-radius:8px;padding:0 16px;font-weight:600}
+#tab-paper{padding:18px}
+/* blueprint (paper) */
+.paper{max-width:860px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:clamp(22px,5vw,64px);font-size:15px;line-height:1.55}
+.paper h1{font-family:var(--display);font-weight:700;font-size:clamp(40px,7vw,76px);line-height:.95;margin:0 0 18px;letter-spacing:-.01em}
+.paper h2{font-family:var(--display);font-weight:700;font-size:34px;line-height:1.05;margin:56px 0 12px;padding-top:18px;border-top:6px solid var(--ink)}
+.paper h2 .n{color:var(--muted);margin-right:10px}
+.paper h3{font-family:var(--display);font-weight:600;font-size:23px;margin:30px 0 6px}
+.paper p,.paper li{max-width:70ch}
+.paper .lede{font-size:19px;line-height:1.55}
+.paper blockquote{margin:22px 0;padding:18px 22px;background:var(--surface2);border-left:6px solid var(--tape);border-radius:4px;white-space:pre-line;font-size:15px}
+.paper table{border-collapse:collapse;width:100%;font-size:14px;margin:14px 0}
+.tablewrap{overflow-x:auto}
+.paper th,.paper td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.paper th{font-family:var(--display);font-size:16px;font-weight:600}
+.paper code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:13px}
+.mermaid{background:var(--surface2);border-radius:8px;padding:16px;overflow-x:auto;font-size:13px}
+.uc{border:1px solid var(--line);border-radius:8px;padding:6px 22px 18px;margin:20px 0}
+.uc .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:640px){.uc .cmp{grid-template-columns:1fr}}
+.uc .cmp div{background:var(--surface2);border-radius:6px;padding:10px 14px;font-size:14px}
+.uc .cmp h4{margin:0 0 4px;font-family:var(--display);font-size:18px;font-weight:600}
+.runbtn{border:0;background:var(--accent);color:var(--accent-ink);border-radius:7px;padding:8px 14px;font-weight:600;margin-top:12px}
+.note{font-size:13px;color:var(--muted)}
+.copybtn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:5px 12px;font-size:13px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="tapebar" aria-hidden="true"></div>
+<header class="top">
+  <div class="brand">Kinetic Twin<small>Sidoarjo Fulfillment Center DC-01, conversational 3D digital twin</small></div>
+  <div class="clock" id="clock">08:00<span id="simstate">sim time</span></div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="twin">Live twin</button>
+    <button role="tab" aria-selected="false" data-tab="paper">Blueprint</button>
+  </nav>
+</header>
+<main id="tab-twin">
+  <div class="twin-grid">
+    <div class="panel">
+      <div class="controls">
+        <span class="ctl-label">Speed</span>
+        <div class="seg" id="speed">
+          <button aria-pressed="false" data-s="0">Pause</button>
+          <button aria-pressed="true" data-s="1">1×</button>
+          <button aria-pressed="false" data-s="5">5×</button>
+          <button aria-pressed="false" data-s="15">15×</button>
+          <button aria-pressed="false" data-s="40">40×</button>
+        </div>
+        <span class="spacer"></span>
+        <span class="ctl-label">Inject disruption</span>
+        <button class="inject" data-scen="surge">Late trucks + e-com surge</button>
+        <button class="inject" data-scen="aisle">Spill in aisle C</button>
+        <button class="inject" data-scen="fault">FL-02 battery fault</button>
+        <button class="inject" id="reset">Reset</button>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="scene3d" aria-label="3D digital twin of the warehouse: dock doors, yard, trucks, racks, staging and forklifts"></canvas>
+        <div id="labels"></div>
+        <div class="viewctl" role="toolbar" aria-label="View">
+          <button id="zin" title="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button id="zout" title="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+          <button id="rot" title="Rotate 90°"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button>
+          <button id="roof" title="Show roof" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 11l9-6 9 6"/><path d="M5 10v9h14v-9"/></svg></button>
+          <button id="home" title="Reset view"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></button>
+        </div>
+        <div class="hint3d">Drag to orbit, right-drag or Shift-drag to pan, scroll to zoom. Tap anything to ask about it.</div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="log"><h3>Event stream</h3><ol id="log"></ol></div>
+    </div>
+    <aside class="panel copilot" aria-label="Ops copilot">
+      <div class="cp-head">
+        <h3 style="margin:0">Ops copilot</h3>
+        <p>Ask about any truck, shipment, door, aisle or forklift. Answers light up the twin.</p>
+        <div class="cp-src" id="cpsrc">Connecting…</div>
+      </div>
+      <div class="watch"><h3 style="font-size:15px;margin:0 0 6px">Watching now</h3><ul id="watch"></ul></div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="chips" id="chips">
+        <button>Why is shipment #78466 delayed?</button>
+        <button>What is slowing down the warehouse right now?</button>
+        <button>Which outbound trucks will miss cutoff?</button>
+        <button>Why did FL-02 stop?</button>
+      </div>
+      <form class="ask" id="askf"><input id="q" autocomplete="off" placeholder="e.g. Why is dock D2 not unloading?" aria-label="Ask the ops copilot"><button type="submit">Ask</button></form>
+    </aside>
+  </div>
+</main>
+
+<section id="tab-paper" hidden>
+<article class="paper">
+  <p class="note">White paper and product blueprint, October 2026</p>
+  <h1>The dashboard is dead. The warehouse is alive.</h1>
+  <p class="lede">A blueprint for a conversational digital twin WMS: a live spatial model of the distribution center that an agentic AI can see, reason over, simulate against, and act on, with a human approving every move that matters.</p>
+
+  <h2><span class="n">1</span>The paradigm shift</h2>
+  <p>For thirty years, warehouse software has asked people to do the hardest part of the job themselves. The WMS records that <em>Truck 2481 is unloading</em>. The yard system records that three trailers are waiting. The labor module records that forklift utilization dropped to 61%. The order pool records that a flash-sale wave just landed. Each fact is true. None of them is the answer. The supervisor is the integration layer, alt-tabbing between screens, phoning the dock lead, and stitching causality together in their head while the cutoff clock runs.</p>
+  <p>Dashboards made this worse by making it look solved. A chart of dock utilization is a photograph of a river: accurate, attractive, and already out of date. It tells you <em>what</em> happened, rarely <em>why</em>, and never <em>what to do next</em>. Operations do not fail in a single metric. They fail in the interaction between metrics, in the queue that forms because a battery died in aisle C, which starved putaway, which filled staging, which stalled door D2, which left a late trailer in the yard, which carries the SKUs your e-commerce wave is about to short.</p>
+  <p>The next generation of warehouse technology replaces the dashboard with a <strong>living model of the business</strong>: a spatially synchronized digital twin where every truck, door, pallet, aisle and forklift exists as a stateful object in real time, and an agentic AI that understands that model well enough to answer questions in plain language, trace the causal chain, simulate the alternatives, and propose the fix on the map. Operators stop reading the warehouse. They talk to it.</p>
+  <p>The measure that matters shifts accordingly, from data freshness to <strong>decision latency</strong>: the time between a disruption forming and a correct, approved intervention executing on the floor. Traditional stacks measure this in tens of minutes. A conversational twin measures it in seconds.</p>
+
+  <h3>LinkedIn-ready version</h3>
+  <blockquote id="post">The warehouse dashboard is dead. We just haven't buried it yet.
+
+Today a supervisor reads "Truck 2481: unloading" on one screen, a yard list on another, forklift utilization on a third, and then plays detective while the cutoff clock runs.
+
+The data was never the problem. The stitching was.
+
+What replaces it is a living digital twin: every truck, door, pallet and forklift moving in real time on a spatial model of the building, with an AI agent embedded inside it.
+
+You don't filter a report. You ask: "Why is shipment #78466 late?"
+
+And the twin answers by pointing: the trailer waiting in the yard, the stalled door, the full staging lane, and the real root cause, a forklift battery fault in aisle C that cut putaway capacity by a quarter. Then it simulates three fixes and asks you to approve one.
+
+From reactive charts to an interactive model of the business. From data freshness to decision latency.
+
+The next WMS won't be read. It will be spoken to.
+
+#SupplyChain #DigitalTwin #AgenticAI #Logistics #WarehouseManagement</blockquote>
+  <button class="copybtn" id="copypost">Copy post</button>
+
+  <h2><span class="n">2</span>High-level system architecture</h2>
+  <p>The platform is six layers joined by one principle: <strong>every event resolves to an entity, a location and a timestamp</strong>. That triple is what lets a sentence, a sensor reading and a pixel on the map refer to the same thing.</p>
+  <pre class="mermaid">
+flowchart LR
+  subgraph L1["Layer 1: Physical edge"]
+    A1["UWB / RTLS tags"]
+    A2["Forklift telematics"]
+    A3["Dock-door vision"]
+    A4["Gate ANPR and yard sensors"]
+    A5["Carrier GPS and ETA feeds"]
+  end
+  subgraph L2["Layer 2: Event backbone"]
+    B1["MQTT / Sparkplug B gateways"]
+    B2["Kafka event log + schema registry"]
+    B3["CDC from WMS, ERP, TMS"]
+    B4["Flink stream processing"]
+  end
+  subgraph L3["Layer 3: Twin state"]
+    C1["Temporal knowledge graph"]
+    C2["Time-series store"]
+    C3["Spatial index: floor graph + grid cells"]
+    C4["State reconciler: book vs physical"]
+  end
+  subgraph L4["Layer 4: Simulate and optimize"]
+    D1["Discrete-event simulation forks"]
+    D2["OR solvers: doors, tasks, slotting"]
+    D3["ML: ETA, velocity, dwell"]
+  end
+  subgraph L5["Layer 5: Agentic AI"]
+    E1["Orchestrator agent"]
+    E2["Specialist agents"]
+    E3["Tool layer via MCP + semantic metrics"]
+    E4["Policy guardrails + approvals"]
+  end
+  subgraph L6["Layer 6: Experience"]
+    F1["2D / 3D spatial twin"]
+    F2["Conversational copilot"]
+    F3["Write-back to WMS and devices"]
+  end
+  A1 & A2 & A3 & A4 & A5 --> B1 --> B2
+  B3 --> B2 --> B4
+  B4 --> C1 & C2 & C3
+  C4 --- C1
+  C1 & C2 & C3 --> E3
+  E3 <--> D1 & D2 & D3
+  E1 --> E2 --> E3
+  E1 <--> F2
+  E1 --> E4 --> F3
+  C3 --> F1
+  F2 -. entity IDs to highlight .-> F1
+  </pre>
+
+  <h3>Layer 1: Physical sensing at the edge</h3>
+  <ul>
+    <li><strong>Real-time location:</strong> UWB RTLS tags on forklifts, pallet jacks and roll cages (sub-30 cm accuracy, 1 to 10 Hz), BLE for lower-value assets, RFID portals at dock doors to confirm pallet identity on crossing.</li>
+    <li><strong>Machine telemetry:</strong> forklift CAN-bus data (load weight, mast height, battery state of charge, impact events) over 5G or private LTE.</li>
+    <li><strong>Computer vision:</strong> door cameras that classify trailer presence, count pallets crossing the threshold, and detect blocked lanes or spills. Inference runs on edge GPUs so video never leaves the site.</li>
+    <li><strong>Yard and transport:</strong> gate ANPR, yard-slot sensors, and carrier ELD/GPS feeds that turn appointment times into continuously updated ETAs.</li>
+    <li><strong>Time discipline:</strong> PTP clock sync across gateways. Spatial synchronization is worthless if two sensors disagree about when something happened.</li>
+  </ul>
+  <h3>Layer 2: Event backbone</h3>
+  <ul>
+    <li>Edge gateways normalize to MQTT with Sparkplug B payloads and bridge into a Kafka (or Redpanda) event log with an enforced schema registry.</li>
+    <li>The existing WMS, ERP and TMS are not replaced. Change-data-capture (Debezium) streams their transactional tables (ASNs, tasks, locations, orders) into the same log, so book state and physical state share one timeline.</li>
+    <li>Flink jobs derive operational signals continuously: dwell time per zone, travel-time inflation per aisle segment, door cycle time, throughput velocity, queue length and arrival rate.</li>
+  </ul>
+  <h3>Layer 3: The twin state</h3>
+  <ul>
+    <li><strong>Temporal knowledge graph</strong> holding the ontology (aligned to ISA-95 and Asset Administration Shell concepts): Site, Zone, Aisle, Location, Door, Trailer, ASN, Order, SKU, Pallet, Forklift, Operator, Task, and their relations (<code>CARRIES</code>, <code>ASSIGNED_TO</code>, <code>LOCATED_IN</code>, <code>BLOCKS</code>, <code>FEEDS</code>). Every edge is versioned in time, so the agent can ask what the graph looked like 40 minutes ago.</li>
+    <li><strong>Spatial index</strong> generated from the facility CAD/BIM (IFC or OpenUSD): a navigation graph of aisles, intersections and doors, plus a grid of occupancy cells. Live congestion becomes edge weights.</li>
+    <li><strong>Time-series store</strong> (TimescaleDB or similar) for high-frequency telemetry and derived KPIs.</li>
+    <li><strong>State reconciler</strong> that continuously compares what the WMS believes against what sensors observe and raises divergence events: phantom inventory, unconfirmed putaways, a forklift the WMS thinks is working that has not moved in 12 minutes.</li>
+  </ul>
+  <h3>Layer 4: Simulation and optimization</h3>
+  <ul>
+    <li>A discrete-event simulation engine that can <strong>fork the live state</strong> and run the next two to four hours forward in seconds, many times in parallel, one fork per candidate intervention.</li>
+    <li>Optimization services (OR-Tools, Gurobi) for door assignment, task interleaving, labor reallocation and dynamic slotting, exposed as callable tools rather than nightly batch jobs.</li>
+    <li>Forecasting models for carrier ETA, pick velocity by SKU and hour, and door cycle time, feeding both the simulator and the agent.</li>
+  </ul>
+  <h3>Layer 5: Agentic AI</h3>
+  <ul>
+    <li>An orchestrator LLM agent that owns the conversation and plans, delegating to specialist agents: Yard and Dock, Inventory and Slotting, Fleet and Labor, Outbound and OTIF, and a Simulation agent.</li>
+    <li>A governed tool layer exposed over MCP: <code>graph.traverse</code>, <code>metrics.query</code> (against a semantic metric layer, never raw production SQL), <code>spatial.path</code>, <code>spatial.density</code>, <code>sim.fork_and_run</code>, <code>opt.solve</code>, <code>action.propose</code>.</li>
+    <li>Retrieval over SOPs, carrier contracts, SLA and detention terms, and safety rules, so recommendations respect how the site actually runs.</li>
+    <li>A policy engine (for example OPA) that decides which actions the agent may only suggest, which need a named approver, and which it may execute inside tight guardrails. Everything is logged for audit.</li>
+  </ul>
+  <h3>Layer 6: Experience and write-back</h3>
+  <ul>
+    <li>A 2D vector twin for web and mobile, and a 3D twin (WebGL/Three.js, or Omniverse/Unreal pixel streaming for control rooms), both rendering the same entity IDs.</li>
+    <li>The copilot returns structured output alongside its prose: entity IDs to highlight, geometry to draw, and typed actions with predicted impact. The UI binds all three to the map.</li>
+    <li>Approved actions are written back to the WMS and to driver tablets through its APIs using a transactional outbox, so the twin never edits the system of record directly.</li>
+  </ul>
+  <div class="tablewrap"><table>
+    <tr><th>Budget</th><th>Target</th><th>Why it matters</th></tr>
+    <tr><td>Sensor to twin</td><td>under 1 s p95</td><td>The map must match what a supervisor sees out of the window.</td></tr>
+    <tr><td>Question to grounded answer</td><td>under 6 s p95</td><td>Faster than opening a second screen.</td></tr>
+    <tr><td>Recommendation with simulation</td><td>under 30 s</td><td>Several forks, 2 to 4 h horizon each.</td></tr>
+    <tr><td>Twin availability</td><td>99.9%, degrade to WMS-only</td><td>The building keeps running if the AI layer does not.</td></tr>
+  </table></div>
+
+  <h2><span class="n">3</span>The conversational and agentic logic</h2>
+  <h3>From a sentence to a grounded answer</h3>
+  <p>When an operator asks <em>"Why is shipment #78466 delayed?"</em>, the agent runs a fixed loop:</p>
+  <ol>
+    <li><strong>Entity resolution.</strong> "#78466" is matched in the graph to an ASN, the trailer carrying it, the carrier, the appointment, and its current location (yard slot 3). Ambiguity is resolved by asking, never by guessing.</li>
+    <li><strong>Planning.</strong> The orchestrator decomposes the question into tool calls: trailer timeline, door states, staging occupancy, putaway capacity, aisle travel-time inflation.</li>
+    <li><strong>Grounded retrieval.</strong> Each call returns typed data with provenance. The model never invents a number; every figure in the answer traces to a tool result.</li>
+    <li><strong>Causal reasoning.</strong> The agent walks the dependency graph backward from the symptom. Queueing theory does the heavy lifting: by Little's Law (L = λW), a rise in staging inventory with constant arrivals means service rate fell; wait time grows non-linearly as utilization passes about 85%, so a small capacity loss can explain a large delay.</li>
+    <li><strong>Spatial grounding.</strong> The answer carries the entity IDs of every link in the chain (the trailer, door D2, the staging lane, aisle C, forklift FL-02) so the twin lights up the story, not just the headline.</li>
+    <li><strong>Prescription.</strong> Candidate interventions are generated, each simulated in a forked twin, and scored on cost of delay, OTIF risk, detention fees, labor and safety.</li>
+    <li><strong>Approval and execution.</strong> The operator approves; the action is written back and tracked.</li>
+    <li><strong>Learning.</strong> Predicted versus actual outcomes are logged and used to recalibrate the simulator and the agent's ranking of interventions.</li>
+  </ol>
+  <h3>Understanding space, not just tables</h3>
+  <p>The warehouse is modelled as a weighted navigation graph whose edge costs update from RTLS dwell and travel times. That gives the agent spatial tools a spreadsheet cannot: shortest feasible path for a forklift avoiding a blocked segment, the nearest idle resource to a door, density of vehicles in a zone, and the walking-distance impact of moving a SKU from aisle C to aisle D. "What is near door D2?" and "which aisle is choking putaway?" become graph queries with geometry attached.</p>
+  <h3>From reporting to prescribing</h3>
+  <ul>
+    <li><strong>Constraint discovery:</strong> the agent identifies the binding constraint (theory of constraints) rather than listing every red metric. Usually there is one.</li>
+    <li><strong>Counterfactual testing:</strong> "if we cross-dock trailer 2617 and move FL-04 to picking, what happens to the 14:00 cutoff?" is answered by simulation, not opinion.</li>
+    <li><strong>Multi-agent negotiation:</strong> the Outbound agent wants every forklift on picking; the Yard agent wants doors cleared. The orchestrator resolves the trade-off against site objectives and shows its reasoning.</li>
+    <li><strong>Graduated autonomy:</strong> level 0 inform, level 1 recommend, level 2 act with approval, level 3 act within guardrails with automatic rollback. Sites earn autonomy per action type, with evidence.</li>
+  </ul>
+
+  <h2><span class="n">4</span>Real-world use cases</h2>
+  <p class="note">Time and impact figures below are illustrative design targets for a mid-size DC, not measured results. Each scenario can be run in the live twin.</p>
+
+  <div class="uc">
+    <h3>The 14:00 collision: delayed inbound meets an e-commerce surge</h3>
+    <p>Three trailers arrive together, 45 to 70 minutes late. Minutes later a marketplace flash sale drops a wave with a tight carrier cutoff. Inbound staging is already above 80%.</p>
+    <div class="cmp">
+      <div><h4>Traditional WMS</h4>The supervisor checks the yard list, the wave backlog and the labor screen separately. It takes 45 to 90 minutes, and a walk to the dock, to realise the late trailer carries the very SKUs the wave is short. The decision is made on instinct.</div>
+      <div><h4>Conversational twin</h4>"What breaks first if we keep the current plan?" The agent joins ASN contents to wave shortages, sees the overlap, simulates three options and recommends: prioritize the urgent trailer, cross-dock it straight to outbound staging, and re-balance one forklift. Decision in under 5 minutes.</div>
+    </div>
+    <button class="runbtn" data-run="surge">Run this in the twin</button>
+  </div>
+
+  <div class="uc">
+    <h3>Dynamic forklift rerouting around a choking aisle</h3>
+    <p>A shrink-wrap spill and a cluster of fast movers turn aisle C into a parking lot. No alarm fires; trips just get slower.</p>
+    <div class="cmp">
+      <div><h4>Traditional WMS</h4>Throughput sags for an hour before anyone notices the pattern in end-of-shift productivity reports. Drivers improvise routes. Slotting is reviewed next month.</div>
+      <div><h4>Conversational twin</h4>RTLS shows travel-time inflation on the aisle C segments within minutes. The agent flags it, reroutes task assignment around the aisle, and proposes dynamic re-slotting of the hottest SKUs into aisle D's golden zone.</div>
+    </div>
+    <button class="runbtn" data-run="aisle">Run this in the twin</button>
+  </div>
+
+  <div class="uc">
+    <h3>"Why is shipment #78466 late?" and the root cause nobody suspected</h3>
+    <p>Everyone blames the carrier. The carrier was late, but that is not what is holding the shipment.</p>
+    <div class="cmp">
+      <div><h4>Traditional WMS</h4>The ASN shows "not received". The yard shows "waiting". A coordinator calls the carrier, then the dock, then maintenance. The real chain surfaces after the detention clock has started.</div>
+      <div><h4>Conversational twin</h4>The answer traces the chain on the map: trailer in yard, all inbound doors busy, D2 stalled because staging is full, staging full because putaway lost a forklift to a battery fault. It proposes a battery swap and a forklift reassignment, then prioritizes the trailer.</div>
+    </div>
+    <button class="runbtn" data-run="fault">Run this in the twin</button>
+  </div>
+
+  <h2><span class="n">5</span>How to prove it works</h2>
+  <ul>
+    <li><strong>Decision latency:</strong> disruption detected to approved action executing.</li>
+    <li><strong>Dock-to-stock time</strong> and <strong>door turn time</strong>, plus trailer detention minutes.</li>
+    <li><strong>Throughput velocity</strong> (pallet moves per hour) and its variance across the shift.</li>
+    <li><strong>OTIF</strong> at carrier cutoff, especially on surge days.</li>
+    <li><strong>Recommendation acceptance rate</strong> and predicted-versus-actual impact of accepted actions.</li>
+  </ul>
+  <h3>Risks worth taking seriously</h3>
+  <ul>
+    <li><strong>Sensor coverage and data quality.</strong> A twin built on gaps is a confident liar. Start with doors, forklifts and staging, where the signal-to-cost ratio is highest.</li>
+    <li><strong>Hallucination.</strong> Mitigated by tool-only grounding, cited figures, and refusing to answer when data is missing.</li>
+    <li><strong>Safety.</strong> The agent never moves people or machines directly; it proposes tasks through the existing WMS and safety rules.</li>
+    <li><strong>Adoption.</strong> Supervisors trust what they can verify. Showing the chain on the map is the trust mechanism.</li>
+  </ul>
+  <p class="note">The live twin in this artifact is a simulation with synthetic data. Inside Claude, its copilot answers with Claude, grounded in a snapshot of the simulated state; in the public demo it runs on a built-in rules engine over the same state.</p>
+</article>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let rnd=mulberry32(11);
+const R=(a,b)=>a+rnd()*(b-a), RI=(a,b)=>Math.floor(R(a,b+1));
+const fmt=m=>{m=Math.round(m);const h=Math.floor(m/60)%24,mm=((m%60)+60)%60;return String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0')};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pl=(n,w)=>n+' '+w+(n===1?'':'s');
+
+/* ================= model (2D sim space, rendered in 3D) ================= */
+const RACKS=[160,270,380,490,600,710,820], RW=40, BAYS=8, BY0=60, BH=40, LANE=420;
+const AISLES=['A','B','C','D','E','F'].map((id,i)=>({id,i,x:RACKS[i]+75}));
+const IN_X=[65,135,205,275], OUT_X=[640,720,800,880];
+const FL_SPEED=220;
+const VEL0={A:1,B:1.4,C:3.2,D:1.2,E:.9,F:.7};let VEL={...VEL0};
+const CFG0={trucksPerDay:18,inDoors:4,put:4,pick:3,cap:36,unload:6,load:2};let CFG={...CFG0};
+const CARRIERS=['Lintas Jawa Logistics','Nusantara Freight','Brantas Cargo','Selat Madura Trans','Arjuno Express'];
+const ROUTES=['Surabaya Kota','Malang','Gresik','Pasuruan','Mojokerto','Kediri','E-com hub Rungkut'];
+const TRL=['Ambient','Mixed','Chilled'];
+const DET_RATE=1.5;
+let S=null,fill;
+const trl=()=>'TRL '+RI(10,89)+'-'+RI(100,899)+', '+TRL[RI(0,2)];
+
+function mkFl(id,role){return{id,role,x:role==='put'?R(50,290):R(610,950),y:R(470,505),path:[],state:'idle',ang:-Math.PI/2,bat:RI(48,96),down:false,carrying:false,task:null,busyE:.7}}
+function nextFlId(){let n=1;while(S.fl.some(f=>f.id==='FL-'+String(n).padStart(2,'0')))n++;return'FL-'+String(n).padStart(2,'0')}
+function init(){
+  rnd=mulberry32(11);VEL={...VEL0};
+  fill=RACKS.map(()=>Array.from({length:BAYS},()=>.35+rnd()*.5));
+  AISLES.forEach(a=>{a.cong=0;a.spill=false;a.avoidUntil=null;a.clearAt=null});
+  S={t:480,speed:S?S.speed:1,inStage:Math.min(24,CFG.cap-4),outStage:4,events:[],log:[],hl:null,sel:null,history:[],upcoming:[],nextGen:492,nTr:2640,nOut:1205,nAsn:78530,surge:false,applied:new Set(),scen:new Set(),received:0,det:0,waits:[],tl:{},tlYard:[],lastMin:480};
+  const mkIn=(id,ship,carrier,pallets,done,appt,eta)=>({dir:'in',id,ship,carrier,pallets,done,appt,eta,status:'scheduled',acc:0,crossdock:false,prio:false,trl:trl(),paint:RI(0,3)});
+  const mkOut=(id,route,needed,loaded,cutoff)=>({dir:'out',id,route,needed,loaded,cutoff,status:'loading',acc:0,trl:trl(),paint:RI(0,3)});
+  S.mkIn=mkIn;S.mkOut=mkOut;
+  S.docks=[...IN_X.map((x,i)=>({id:'D'+(i+1),x,dir:'in',truck:null})),...OUT_X.map((x,i)=>({id:'D'+(i+5),x,dir:'out',truck:null}))];
+  [['TRK-2481','SHP-78402',0,18,11,410],['TRK-2502','SHP-78431',1,20,4,450],['TRK-2533','SHP-78440',2,16,12,430],['TRK-2555','SHP-78452',3,18,2,465]].forEach((s,i)=>{
+    const tr=mkIn(s[0],s[1],CARRIERS[s[2]],s[3],s[4],s[5],s[5]+RI(0,8));tr.status='unloading';tr.atDoor=true;tr.arrivedAt=tr.eta;tr.dock='D'+(i+1);tr.doorAt=tr.eta+5;S.received+=s[4];S.docks[i].truck=tr});
+  [['OUT-1201','Surabaya Kota',14,6,560],['OUT-1202','Malang',16,3,585],['OUT-1203','E-com hub Rungkut',12,8,540],['OUT-1204','Gresik',12,0,620]].forEach((s,i)=>{const tr=mkOut(...s);tr.dock='D'+(i+5);tr.atDoor=true;S.docks[4+i].truck=tr});
+  const y1=mkIn('TRK-2617','SHP-78466',CARRIERS[4],18,0,440,473);y1.status='yard';y1.arrivedAt=473;
+  const y2=mkIn('TRK-2630','SHP-78512',CARRIERS[1],14,0,490,494);
+  S.upcoming=[y1,y2];
+  S.fl=[];for(let i=0;i<CFG.put;i++)S.fl.push(mkFl(nextFlId(),'put'));for(let i=0;i<CFG.pick;i++)S.fl.push(mkFl(nextFlId(),'pick'));
+  log('Shift running. TRK-2617 (SHP-78466) is waiting in the yard for an inbound door.','ai');
+  $$('.inject[data-scen]').forEach(b=>b.dataset.on='false');
+}
+let logDirty=true;
+function log(msg,kind=''){S.log.unshift({t:S.t,msg,kind});S.log.length=Math.min(S.log.length,80);logDirty=true}
+
+/* ---------- forklifts ---------- */
+function aisleFill(a){const r=[...fill[a.i],...fill[a.i+1]];return r.reduce((s,v)=>s+v,0)/r.length}
+function chooseAisle(kind){
+  let opts=AISLES.filter(a=>!a.avoidUntil);if(!opts.length)opts=AISLES;
+  if(kind==='put'){const s=opts.slice().sort((a,b)=>aisleFill(a)-aisleFill(b));return s[Math.min(s.length-1,RI(0,2))]}
+  const tot=opts.reduce((s,a)=>s+VEL[a.id],0);let r=rnd()*tot;for(const a of opts){r-=VEL[a.id];if(r<=0)return a}return opts[0];
+}
+function go(f,tx,ty,cb){const p=[];if(Math.abs(f.y-LANE)>.5)p.push([f.x,LANE]);p.push([tx,LANE],[tx,ty]);f.path=p;f.state='travel';f.cb=cb||null}
+function picksInFlight(){return S.fl.filter(f=>f.task==='pick').length}
+function outDemand(){let d=0;S.docks.forEach(k=>{const t=k.truck;if(k.dir==='out'&&t&&t.status!=='departing')d+=t.needed-t.loaded});return d-S.outStage-picksInFlight()}
+function assign(f){
+  if(f.down)return;
+  if(f.role==='put'){
+    if(S.inStage<=0)return;S.inStage--;f.carrying=true;f.task='put';
+    const a=chooseAisle('put'),side=rnd()<.5?a.i:a.i+1,bay=RI(0,BAYS-1);
+    go(f,a.x,BY0+bay*BH+BH/2,()=>{f.state='handling';f.hold=1.1;f.after=()=>{fill[side][bay]=Math.min(1,fill[side][bay]+.07);f.carrying=false;f.task=null;S.events.push({t:S.t,k:'put'});go(f,R(50,290),R(470,505))}});
+  }else{
+    if(outDemand()<=0)return;f.task='pick';
+    const a=chooseAisle('pick'),side=rnd()<.5?a.i:a.i+1,bay=RI(0,BAYS-1);
+    go(f,a.x,BY0+bay*BH+BH/2,()=>{f.state='handling';f.hold=1.1;f.after=()=>{fill[side][bay]=Math.max(.03,fill[side][bay]-.07);f.carrying=true;go(f,R(610,950),R(470,505),()=>{f.carrying=false;f.task=null;S.outStage++})}});
+  }
+}
+function aisleOf(f){return AISLES.find(a=>Math.abs(f.x-a.x)<4&&f.y<LANE-4)||null}
+function speedFactor(f){const a=aisleOf(f);if(!a)return 1;if(a.spill)return .2;return 1-.55*Math.min(1,a.cong)}
+function stepFl(f,dt){
+  if(f.state==='handling'){f.hold-=dt;if(f.hold<=0){f.state='idle';const a=f.after;f.after=null;a&&a()}return}
+  if(f.down&&!f.path.length){f.state='down';if(f.repairAt!=null&&S.t>=f.repairAt){f.down=false;f.repairAt=null;f.bat=100;f.state='idle';log(f.id+' back in service after battery swap','ok')}return}
+  if(!f.path.length){if(f.state==='travel'){f.state='idle';const cb=f.cb;f.cb=null;cb&&cb()}if(f.state==='idle')assign(f);return}
+  let budget=FL_SPEED*dt*speedFactor(f);
+  while(budget>0&&f.path.length){const[tx,ty]=f.path[0],dx=tx-f.x,dy=ty-f.y,d=Math.hypot(dx,dy);if(d<.01){f.path.shift();continue}
+    f.ang=Math.atan2(dy,dx);if(d<=budget){f.x=tx;f.y=ty;budget-=d;f.path.shift()}else{f.x+=dx/d*budget;f.y+=dy/d*budget;budget=0}}
+  if(!f.down)f.bat=Math.max(8,f.bat-dt*.015);
+}
+function breakdown(id){
+  const f=S.fl.find(x=>x.id===id);if(!f||f.down)return false;
+  if(f.task==='put'&&f.carrying)S.inStage++;
+  f.down=true;f.task=null;f.carrying=false;f.after=null;f.bat=4;f.repairAt=null;
+  const idx=S.fl.indexOf(f)%8;go(f,70,80+idx*16);f.cb=null;
+  log(id+' battery fault: pulled out of service, parked at charging','bad');return true;
+}
+function setFleet(role,n){
+  const cur=S.fl.filter(f=>f.role===role);
+  if(cur.length<n){for(let k=cur.length;k<n;k++)S.fl.push(mkFl(nextFlId(),role))}
+  else if(cur.length>n){const rm=cur.slice().sort((a,b)=>(a.down?0:1)-(b.down?0:1)||(a.task?1:0)-(b.task?1:0)).slice(0,cur.length-n);
+    rm.forEach(f=>{if(f.task==='put'&&f.carrying)S.inStage++;S.fl.splice(S.fl.indexOf(f),1)})}
+}
+
+/* ---------- docks & yard ---------- */
+function newIn(){const eta=S.t+R(20,45),late=rnd()<.35;return S.mkIn('TRK-'+(S.nTr+=RI(3,17)),'SHP-'+(S.nAsn+=RI(5,40)),CARRIERS[RI(0,4)],RI(12,20),0,Math.round(eta-(late?R(15,45):R(-8,6))),Math.round(eta))}
+function newOut(dock){const tr=S.mkOut('OUT-'+(S.nOut++),ROUTES[RI(0,ROUTES.length-1)],RI(8,13)+(S.surge?4:0),0,Math.round(S.t+R(95,150)));tr.status='docking';tr.dock=dock.id;return tr}
+function yardQueue(){return S.upcoming.filter(t=>t.status==='yard').sort((a,b)=>(b.prio-a.prio)||(a.arrivedAt-b.arrivedAt))}
+const doorIdx=d=>+d.id.slice(1)-1;
+function stepDocks(dm){
+  const order=[...S.docks.filter(d=>d.dir==='in'),...S.docks.filter(d=>d.dir==='out').sort((a,b)=>(a.truck?a.truck.cutoff:1e9)-(b.truck?b.truck.cutoff:1e9))];
+  order.forEach(d=>{
+    const tr=d.truck;
+    if(!tr){if(d.dir==='out'&&d.reopen!=null&&S.t>=d.reopen){d.reopen=null;d.truck=newOut(d)}return}
+    if(tr.status==='docking'){if(tr.atDoor){tr.status=d.dir==='in'?'unloading':'loading';tr.dockedAt=S.t;log(tr.id+' docked at '+d.id)}return}
+    if(tr.status==='departing'){tr.depT=(tr.depT||0)+dm;if(tr.depT>=2.5){d.truck=null;if(d.dir==='out')d.reopen=S.t+4}return}
+    if(d.dir==='in'){
+      if(tr.crossdock||S.inStage<CFG.cap){
+        if(tr.status==='stalled')log(d.id+' resumed unloading '+tr.id,'ok');
+        tr.status='unloading';tr.acc+=dm;
+        while(tr.acc>=CFG.unload&&tr.done<tr.pallets){tr.acc-=CFG.unload;tr.done++;S.received++;if(tr.crossdock){S.outStage++;S.events.push({t:S.t,k:'xd'})}else{S.inStage++;if(S.inStage>=CFG.cap)break}}
+      }else if(tr.status!=='stalled'){tr.status='stalled';tr.stalledAt=S.t;log(d.id+' stalled: inbound staging full ('+S.inStage+'/'+CFG.cap+')','bad')}
+      if(tr.done>=tr.pallets){tr.status='departing';tr.leftAt=S.t;S.history.push(tr);log(tr.id+' ('+tr.ship+') fully received at '+d.id)}
+    }else{
+      if(S.outStage>0){tr.status='loading';tr.acc+=dm;while(tr.acc>=CFG.load&&S.outStage>0&&tr.loaded<tr.needed){tr.acc-=CFG.load;tr.loaded++;S.outStage--;S.events.push({t:S.t,k:'load'})}}
+      else{tr.status='waiting';tr.acc=Math.min(tr.acc+dm,CFG.load)}
+      if(tr.loaded>=tr.needed){tr.status='departing';const late=S.t-tr.cutoff;log(tr.id+' departed for '+tr.route+(late>0?', '+Math.round(late)+' min after cutoff':', on time'),late>0?'bad':'ok')}
+    }
+  });
+  S.upcoming.forEach(tr=>{if(tr.status==='scheduled'&&S.t>=tr.eta){tr.status='yard';tr.arrivedAt=tr.eta;const l=tr.eta-tr.appt;log(tr.id+' ('+tr.ship+') checked in at gate'+(l>10?', '+Math.round(l)+' min past appointment':''),l>10?'bad':'')}});
+  S.docks.filter(d=>d.dir==='in'&&!d.truck&&doorIdx(d)<CFG.inDoors).forEach(d=>{const q=yardQueue();if(q.length){const tr=q[0];tr.status='docking';tr.dock=d.id;tr.doorAt=S.t;tr.atDoor=false;d.truck=tr;S.upcoming=S.upcoming.filter(x=>x!==tr);S.waits.push({t:S.t,w:S.t-tr.arrivedAt});log(tr.id+' sent to '+d.id+' after '+Math.round(S.t-tr.arrivedAt)+' min in yard')}});
+  if(S.t>=S.nextGen){S.upcoming.push(newIn());S.nextGen=S.t+(600/CFG.trucksPerDay)*R(.75,1.25)}
+  AISLES.forEach(a=>{if(a.clearAt!=null&&S.t>=a.clearAt){a.spill=false;a.clearAt=null;log('Aisle '+a.id+' cleared and reopened','ok')}if(a.avoidUntil!=null&&S.t>=a.avoidUntil&&!a.spill){a.avoidUntil=null;log('Aisle '+a.id+' back in normal task rotation')}});
+  yardQueue().forEach(t=>{if(S.t-t.arrivedAt>30)S.det+=dm*DET_RATE});
+}
+
+/* ---------- scenarios & actions ---------- */
+const SCEN={
+  surge(){
+    S.surge=true;
+    S.docks.forEach(d=>{const t=d.truck;if(d.dir==='out'&&t&&t.status!=='departing'){t.needed+=6;t.cutoff=Math.min(t.cutoff,Math.round(S.t+R(55,85)))}});
+    for(let i=0;i<3;i++){const tr=newIn();tr.eta=S.t;tr.appt=Math.round(S.t-R(45,70));tr.status='yard';tr.arrivedAt=S.t;tr.urgent=i===0;S.upcoming.push(tr)}
+    const u=S.upcoming.find(t=>t.urgent);
+    log('Flash-sale wave released: +6 pallets on every outbound truck, cutoffs pulled forward','bad');
+    log('3 delayed trailers arrived together; '+u.id+' carries SKUs short for the e-com wave','bad');
+  },
+  aisle(){const a=AISLES[2];a.spill=true;a.clearAt=null;log('Shrink-wrap spill reported in aisle C, traffic crawling','bad')},
+  fault(){if(!S.fl.find(f=>f.id==='FL-02'))S.fl.splice(1,0,mkFl('FL-02','put'));breakdown('FL-02');S.inStage=Math.max(S.inStage,CFG.cap-2);log('FL-02 sat idle 25 min before the fault was flagged; inbound staging backed up to '+S.inStage+'/'+CFG.cap,'bad')}
+};
+const ACTIONS={
+  prioritize:id=>({label:'Move '+id+' to the front of the door queue',run(){const t=S.upcoming.find(x=>x.id===id);if(t){t.prio=true;log('Approved: '+id+' prioritized for next inbound door','ai')}}}),
+  crossdock:id=>({label:'Cross-dock '+id+' straight to outbound staging',run(){const t=findTruck(id);if(t){t.crossdock=true;log('Approved: '+id+' set to cross-dock, bypassing putaway','ai')}}}),
+  reroute:a=>({label:'Route tasks around aisle '+a+' and re-slot its fast movers to aisle D',run(){const ai=AISLES.find(x=>x.id===a);ai.avoidUntil=S.t+60;if(ai.spill)ai.clearAt=S.t+25;VEL.D+=VEL[a]*.5;VEL[a]*=.5;log('Approved: aisle '+a+' bypassed for 60 min, cleanup dispatched, hot SKUs re-slotted','ai')}}),
+  reassign:(id,role)=>({label:'Switch '+id+' to '+(role==='put'?'putaway':'picking'),run(){const f=S.fl.find(x=>x.id===id);if(f){f.role=role;log('Approved: '+id+' reassigned to '+(role==='put'?'putaway':'picking'),'ai')}}}),
+  battery:id=>({label:'Dispatch battery swap for '+id+' (back in about 15 min)',run(){const f=S.fl.find(x=>x.id===id);if(f&&f.down){f.repairAt=S.t+15;log('Approved: battery swap dispatched to '+id,'ai')}}})
+};
+function action(key){const[k,...a]=key.split(':');return ACTIONS[k]?ACTIONS[k](...a):null}
+function findTruck(id){for(const d of S.docks)if(d.truck&&d.truck.id===id)return d.truck;return S.upcoming.find(t=>t.id===id)||S.history.find(t=>t.id===id)||null}
+
+/* ---------- diagnosis ---------- */
+function remainMin(tr){return tr.dir==='in'?(tr.pallets-tr.done)*CFG.unload:(tr.needed-tr.loaded)*CFG.load}
+function pickRate(){return S.fl.filter(f=>f.role==='pick'&&!f.down).length*(60/6.5)/60}
+function outProjection(tr){const rem=tr.needed-tr.loaded;let ahead=0;S.docks.forEach(d=>{const t=d.truck;if(d.dir==='out'&&t&&t.status!=='departing'&&t.cutoff<=tr.cutoff)ahead+=t.needed-t.loaded});const r=pickRate()||.01;return S.t+Math.max(rem*CFG.load,Math.max(0,ahead-S.outStage)/r)}
+function ctx(){
+  const inD=S.docks.filter(d=>d.dir==='in'),open=inD.filter(d=>doorIdx(d)<CFG.inDoors),stalled=inD.filter(d=>d.truck&&d.truck.status==='stalled');
+  const put=S.fl.filter(f=>f.role==='put'),putUp=put.filter(f=>!f.down),down=S.fl.filter(f=>f.down);
+  return{inD,open,stalled,put,putUp,down,cong:AISLES.filter(a=>a.spill||a.cong>=.7),stageP:S.inStage/CFG.cap};
+}
+function upstreamChain(c){
+  const lines=[],ids=['IN-STAGE'],acts=[];
+  lines.push('Inbound staging is at '+S.inStage+'/'+CFG.cap+' pallet positions, so doors cannot offload faster than putaway clears it.');
+  c.down.forEach(f=>{lines.push(f.id+' is out of service (battery fault)'+(f.role==='put'?', cutting putaway capacity to '+c.putUp.length+' of '+c.put.length+' forklifts.':'.'));ids.push(f.id,'CHG');if(f.repairAt==null)acts.push('battery:'+f.id)});
+  c.cong.forEach(a=>{lines.push('Aisle '+a.id+' is '+(a.spill?'blocked by a spill':'congested')+', inflating forklift travel times there'+(a.spill?' by roughly 5×.':'.'));ids.push('AISLE-'+a.id);if(!a.avoidUntil)acts.push('reroute:'+a.id)});
+  const spare=S.fl.find(f=>f.role==='pick'&&!f.down&&f.id==='FL-07')||S.fl.find(f=>f.role==='pick'&&!f.down);
+  if(c.stageP>=.8&&spare&&!S.surge)acts.push('reassign:'+spare.id+':put');
+  return{lines,ids,acts};
+}
+function rootCause(c,tr){
+  const put0=c.down.find(f=>f.role==='put'),sp0=c.cong.find(a=>a.spill);
+  if(put0&&(c.stalled.length||c.stageP>=.8))return'Root cause: the '+put0.id+' battery fault, not the carrier. Losing a putaway forklift backed up staging, which stalled the doors.';
+  if(sp0&&(c.stalled.length||c.stageP>=.8))return'Root cause: the aisle '+sp0.id+' spill. Putaway trips through it are crawling, so staging cannot drain.';
+  if(c.stalled.length)return'Root cause: putaway throughput is below unloading rate, so staging saturated.';
+  if(!tr){
+    if(put0)return'Biggest drag: '+put0.id+' is down, so putaway runs at '+c.putUp.length+'/'+c.put.length+' capacity and staging ('+S.inStage+'/'+CFG.cap+') is filling toward a door stall.';
+    if(sp0)return'Biggest drag: the aisle '+sp0.id+' spill. It holds the fastest movers, so every pick routed there crawls.';
+    if(c.down.length)return'Biggest drag: '+c.down[0].id+' is down, cutting pick capacity into outbound staging.';
+    if(c.cong.length)return'Biggest drag: congestion in aisle '+c.cong[0].id+', where fast movers concentrate pickers.';
+    if(c.open.length<4)return'Biggest drag: only '+c.open.length+' of 4 inbound doors are open.';
+  }
+  if(tr&&tr.eta-tr.appt>15)return'Root cause: mainly the carrier, which arrived '+Math.round(tr.eta-tr.appt)+' min past appointment into a full door schedule.';
+  if(c.open.length<4)return'Root cause: door capacity. Only '+c.open.length+' of 4 inbound doors are open.';
+  return'This is a normal door queue; no abnormal constraint detected.';
+}
+function explainIn(tr){
+  const c=ctx(),L=[],ids=[tr.id],acts=[];const late=Math.round(tr.eta-tr.appt);
+  L.push('**'+tr.ship+'** is on '+tr.id+' ('+tr.carrier+'), '+tr.pallets+' pallets.');
+  if(tr.status==='scheduled'){L.push('Not on site yet. Appointment '+fmt(tr.appt)+', current ETA '+fmt(tr.eta)+(late>5?' ('+late+' min late).':'.'));return{text:L.join('\n'),ids,acts}}
+  if(tr.status==='departing'||S.history.includes(tr)){L.push('Fully received at '+tr.dock+(tr.leftAt?' at '+fmt(tr.leftAt):'')+'. Nothing is holding it now.');ids.push(tr.dock);return{text:L.join('\n'),ids,acts}}
+  if(late>5)L.push('- Carrier side: appointment '+fmt(tr.appt)+', checked in '+fmt(tr.eta)+', '+late+' min late.');
+  if(tr.status==='yard'){
+    const q=yardQueue(),pos=q.indexOf(tr)+1;ids.push('YARD');
+    L.push('- Waiting in the yard for '+Math.round(S.t-tr.arrivedAt)+' min, position '+pos+' of '+q.length+' for an inbound door.');
+    const busy=c.open.filter(d=>d.truck);
+    if(busy.length===c.open.length){const soon=busy.filter(d=>d.truck.status!=='stalled').map(d=>({d,m:remainMin(d.truck)})).sort((a,b)=>a.m-b.m)[0];
+      L.push('- All '+c.open.length+' open inbound doors are occupied'+(soon?'; the earliest to free up is '+soon.d.id+(soon.m<2?', any moment now.':' in about '+Math.round(soon.m)+' min.'):'.'));ids.push(...c.open.map(d=>d.id))}
+    if(c.open.length<4)L.push('- '+(4-c.open.length)+' inbound '+(4-c.open.length>1?'doors are':'door is')+' closed in the stress test.');
+    if(c.stalled.length){L.push('- '+c.stalled.map(d=>d.id).join(', ')+(c.stalled.length>1?' are':' is')+' stalled mid-unload, so the queue is not moving.');const u=upstreamChain(c);u.lines.forEach(x=>L.push('- '+x));ids.push(...u.ids);acts.push(...u.acts)}
+    if(pos>1)acts.unshift('prioritize:'+tr.id);
+    if((S.surge||tr.urgent)&&!tr.crossdock)acts.unshift('crossdock:'+tr.id);
+  }else{
+    ids.push(tr.dock);
+    if(tr.status==='docking')L.push('- Backing in to '+tr.dock+' now.');
+    else L.push('- At '+tr.dock+', '+tr.done+'/'+tr.pallets+' pallets unloaded'+(tr.status==='stalled'?', currently **stalled**.':', about '+Math.round(remainMin(tr))+' min to go.'));
+    if(tr.status==='stalled'){const u=upstreamChain(c);u.lines.forEach(x=>L.push('- '+x));ids.push(...u.ids);acts.push(...u.acts);if(!tr.crossdock&&S.surge)acts.push('crossdock:'+tr.id);L.push(rootCause(c,tr))}
+    else L.push(late>5?'It is moving now; the earlier delay came from the carrier arriving late into a full door schedule.':'Nothing is holding it now.');
+    return{text:L.join('\n'),ids,acts};
+  }
+  L.push(rootCause(c,tr));
+  return{text:L.join('\n'),ids,acts};
+}
+function explainOut(tr){
+  const proj=outProjection(tr),risk=proj>tr.cutoff&&tr.status!=='departing',L=[],ids=[tr.id,tr.dock,'OUT-STAGE'],acts=[];
+  L.push('**'+tr.id+'** to '+tr.route+' at '+tr.dock+': '+tr.loaded+'/'+tr.needed+' pallets loaded, cutoff '+fmt(tr.cutoff)+'.');
+  if(tr.status==='departing'){L.push('- Loaded and pulling out.');return{text:L.join('\n'),ids,acts}}
+  L.push('- Projected completion '+fmt(proj)+(risk?', **'+Math.round(proj-tr.cutoff)+' min past cutoff**.':', inside cutoff.'));
+  if(tr.status==='waiting')L.push('- Loading is idle: outbound staging is empty, so the dock is waiting on picks.');
+  const pk=S.fl.filter(f=>f.role==='pick'&&!f.down);L.push('- '+pl(pk.length,'forklift')+' on picking.'+(AISLES[2].spill||AISLES[2].cong>.7?' Aisle C, where the fastest movers sit, is congested.':''));
+  pk.forEach(f=>ids.push(f.id));
+  if(risk){ctx().cong.forEach(a=>{if(!a.avoidUntil)acts.push('reroute:'+a.id);ids.push('AISLE-'+a.id)});
+    const u=S.upcoming.find(t=>t.urgent&&!t.crossdock)||S.docks.map(d=>d.truck).find(t=>t&&t.urgent&&!t.crossdock);if(u)acts.push('crossdock:'+u.id);
+    const spare=S.fl.find(f=>f.role==='put'&&!f.down);if(spare&&S.inStage<CFG.cap*.7)acts.push('reassign:'+spare.id+':pick')}
+  return{text:L.join('\n'),ids,acts};
+}
+function explainFl(f){
+  const a=aisleOf(f),L=[],ids=[f.id],acts=[];
+  L.push('**'+f.id+'** is on '+(f.role==='put'?'putaway':'picking')+', battery '+Math.round(f.bat)+'%.');
+  if(f.down){L.push('- Out of service after a battery fault, parked at the charging bay.'+(f.repairAt!=null?' Swap underway, back around '+fmt(f.repairAt)+'.':' No swap dispatched yet.'));ids.push('CHG');if(f.repairAt==null)acts.push('battery:'+f.id);
+    if(f.role==='put'){const c=ctx();L.push('- Putaway is down to '+c.putUp.length+' of '+c.put.length+' forklifts; inbound staging is at '+S.inStage+'/'+CFG.cap+'.');ids.push('IN-STAGE');const sp=S.fl.find(x=>x.role==='pick'&&!x.down);if(sp&&!S.surge)acts.push('reassign:'+sp.id+':put')}}
+  else if(f.state==='idle')L.push('- Idle: '+(f.role==='put'?'no pallets waiting in inbound staging.':'no open pick demand right now.'));
+  else L.push('- Working'+(f.task?' a '+(f.task==='put'?'putaway':'pick')+' task':'')+(a?' in aisle '+a.id+(a.spill||a.cong>.5?', which is congested.':'.'):'.'));
+  if(a)ids.push('AISLE-'+a.id);
+  return{text:L.join('\n'),ids,acts};
+}
+function explainDock(d){
+  const tr=d.truck;
+  if(d.dir==='in'&&doorIdx(d)>=CFG.inDoors&&!tr)return{text:'**'+d.id+'** is closed in the current stress test (inbound doors open: '+CFG.inDoors+').',ids:[d.id],acts:[]};
+  if(!tr)return{text:'**'+d.id+'** is empty right now'+(d.dir==='out'&&d.reopen?', next outbound truck due around '+fmt(d.reopen)+'.':'.'),ids:[d.id],acts:[]};
+  const r=tr.dir==='in'?explainIn(tr):explainOut(tr);r.ids.push(d.id);return r;
+}
+function explainAisle(a){
+  const n=S.fl.filter(f=>aisleOf(f)===a);const L=['**Aisle '+a.id+'**: '+pl(n.length,'forklift')+' inside now, average slot fill '+Math.round(aisleFill(a)*100)+'%.'];
+  const acts=[];if(a.spill)L.push('- Blocked by a spill; travel speed is down about 80%.');else if(a.cong>=.7)L.push('- Congested: fast movers are concentrated here, so pickers queue.');else L.push('- Flowing normally.');
+  if(a.avoidUntil)L.push('- Bypassed by task routing until '+fmt(a.avoidUntil)+'.');else if(a.spill||a.cong>=.7)acts.push('reroute:'+a.id);
+  return{text:L.join('\n'),ids:['AISLE-'+a.id,...n.map(f=>f.id)],acts};
+}
+function diagnose(){
+  const c=ctx(),F=[];
+  c.down.forEach(f=>F.push({key:'down-'+f.id,sev:3,title:f.id+' out of service',sub:f.repairAt!=null?'Battery swap underway':'Battery fault, '+(f.role==='put'?'putaway':'picking')+' capacity reduced',q:'Why did '+f.id+' stop?'}));
+  c.cong.forEach(a=>F.push({key:'aisle-'+a.id,sev:a.spill?3:2,title:'Aisle '+a.id+(a.spill?' blocked by spill':' congested'),sub:a.avoidUntil?'Rerouted, clearing':'Travel times inflated',q:'What is happening in aisle '+a.id+'?'}));
+  if(c.stalled.length)F.push({key:'stall',sev:3,title:c.stalled.map(d=>d.id).join(', ')+' stalled',sub:'Inbound staging full ('+S.inStage+'/'+CFG.cap+')',q:'Why is '+c.stalled[0].id+' not unloading?'});
+  else if(c.stageP>=.85)F.push({key:'stage',sev:2,title:'Inbound staging at '+Math.round(c.stageP*100)+'%',sub:'Doors will stall soon',q:'What is slowing down the warehouse right now?'});
+  yardQueue().forEach(t=>{const w=S.t-t.arrivedAt;if(w>=12||t.eta-t.appt>=20)F.push({key:'yard-'+t.id,sev:w>=30?3:2,title:t.ship+' waiting '+Math.round(w)+' min',sub:t.id+' in yard'+(t.urgent?', urgent SKUs':''),q:'Why is shipment #'+t.ship.slice(4)+' delayed?'})});
+  S.docks.forEach(d=>{const t=d.truck;if(d.dir==='out'&&t&&t.status!=='departing'&&t.status!=='docking'){const p=outProjection(t);if(p>t.cutoff)F.push({key:'cut-'+t.id,sev:p-t.cutoff>30?3:2,title:t.id+' at risk of missing cutoff',sub:'Cutoff '+fmt(t.cutoff)+', projected '+fmt(p),q:'Will '+t.id+' make its cutoff?'})}});
+  return F.sort((a,b)=>b.sev-a.sev);
+}
+function slowdown(){
+  const F=diagnose(),c=ctx();
+  if(!F.length)return{text:'Nothing abnormal right now. Doors are cycling, staging is at '+S.inStage+'/'+CFG.cap+', and every outbound truck is projected inside cutoff.',ids:['IN-STAGE','OUT-STAGE'],acts:[]};
+  const L=['The binding constraint right now:',rootCause(c)],ids=[],acts=[];
+  F.slice(0,4).forEach(f=>L.push('- '+f.title+': '+f.sub+'.'));
+  const u=upstreamChain(c);if(c.stageP>=.8||c.stalled.length||c.down.length||c.cong.length){ids.push(...u.ids);acts.push(...u.acts)}
+  c.stalled.forEach(d=>ids.push(d.id));
+  yardQueue().slice(0,2).forEach(t=>{ids.push(t.id);if(S.surge&&t.urgent&&!t.crossdock)acts.unshift('crossdock:'+t.id)});
+  return{text:L.join('\n'),ids,acts};
+}
+function cutoffs(){
+  const outs=S.docks.filter(d=>d.dir==='out'&&d.truck&&d.truck.status!=='departing');
+  const risky=outs.filter(d=>outProjection(d.truck)>d.truck.cutoff);
+  if(!risky.length)return{text:'All '+outs.length+' outbound trucks are projected to make cutoff. Outbound staging holds '+S.outStage+' pallets.',ids:outs.map(d=>d.id),acts:[]};
+  const L=[pl(risky.length,'outbound truck')+' projected to miss cutoff:'],ids=[],acts=new Set();
+  risky.forEach(d=>{const t=d.truck,r=explainOut(t);L.push('- '+t.id+' ('+t.route+', '+d.id+'): '+t.loaded+'/'+t.needed+', cutoff '+fmt(t.cutoff)+', projected '+fmt(outProjection(t))+'.');ids.push(...r.ids);r.acts.forEach(a=>acts.add(a))});
+  L.push('The limiter is pick throughput into outbound staging, not door capacity.');
+  return{text:L.join('\n'),ids,acts:[...acts]};
+}
+function overview(){
+  const c=ctx(),F=diagnose();
+  const L=['It is '+fmt(S.t)+'. '+c.open.filter(d=>d.truck).length+'/'+c.open.length+' open inbound and '+S.docks.filter(d=>d.dir==='out'&&d.truck).length+'/4 outbound doors occupied, '+pl(yardQueue().length,'trailer')+' in the yard, inbound staging '+S.inStage+'/'+CFG.cap+'.'];
+  if(F.length)L.push('Top issue: '+F[0].title+' ('+F[0].sub+').');
+  return{text:L.join('\n'),ids:['YARD','IN-STAGE'],acts:[]};
+}
+function localAnswer(q){
+  const s=q.toLowerCase();
+  const fm=s.match(/fl-?(\d{1,2})\b/);if(fm){const f=S.fl.find(x=>x.id==='FL-'+fm[1].padStart(2,'0'));if(f)return explainFl(f)}
+  const num=s.match(/(\d{4,5})/);if(num){const n=num[1];
+    const all=[...S.docks.map(d=>d.truck).filter(Boolean),...S.upcoming,...S.history];
+    const t=all.find(x=>(x.ship&&x.ship.endsWith(n))||x.id.endsWith(n));
+    if(t)return t.dir==='in'?explainIn(t):explainOut(t);
+    return{text:'I cannot find #'+n+' in today\'s ASNs, trailers or outbound loads. It may be scheduled for another day or entered under a different reference.',ids:[],acts:[]}}
+  const dm=s.match(/\b(?:dock|door|pintu)?\s*d([1-8])\b/);if(dm)return explainDock(S.docks[+dm[1]-1]);
+  const am=s.match(/(?:aisle|lorong|rak)\s*([a-f])\b/);if(am)return explainAisle(AISLES.find(a=>a.id===am[1].toUpperCase()));
+  if(/cutoff|cut-off|miss|telat kirim|outbound|on time|tepat waktu/.test(s))return cutoffs();
+  if(/slow|bottleneck|lambat|hambat|macet|masalah|problem|wrong|issue|break first|staging/.test(s))return slowdown();
+  if(/forklift|fleet|armada|charging/.test(s)){const d=S.fl.filter(f=>f.down);return d.length?explainFl(d[0]):{text:'All '+S.fl.length+' forklifts are in service: '+S.fl.filter(f=>f.role==='put').map(f=>f.id).join(', ')+' on putaway, '+S.fl.filter(f=>f.role==='pick').map(f=>f.id).join(', ')+' on picking.',ids:S.fl.map(f=>f.id),acts:[]}}
+  if(/yard|antri|queue|waiting/.test(s)){const q=yardQueue();if(q.length)return explainIn(q[0])}
+  return overview();
+}
+
+/* ---------- Claude via sample capability ---------- */
+let samplerReady=null,sampleOff=false;
+const samplerP=(async()=>{try{if(!window.claude||!window.claude.use)return null;return await window.claude.use('sample')}catch(e){return null}})();
+samplerP.then(s=>{samplerReady=s;$('#cpsrc').textContent=s?'Answers by Claude, grounded in the live twin state.':'Public demo: the copilot runs on a built-in rules engine that reads the live twin state.'});
+setTimeout(()=>{if(samplerReady===null)$('#cpsrc').textContent=window.claude?'Answers by the built-in rules engine until Claude connects.':'Public demo: the copilot runs on a built-in rules engine that reads the live twin state.'},window.claude?3000:0);
+function knownIds(){return new Set([...S.fl.map(f=>f.id),...S.docks.map(d=>d.id),...S.docks.map(d=>d.truck&&d.truck.id).filter(Boolean),...S.upcoming.map(t=>t.id),...AISLES.map(a=>'AISLE-'+a.id),'IN-STAGE','OUT-STAGE','YARD','CHG'])}
+function snapshot(){
+  return{time:fmt(S.t),surgeActive:S.surge,stressTestSettings:CFG,
+    inboundStaging:{pallets:S.inStage,capacity:CFG.cap},outboundStagingPallets:S.outStage,
+    docks:S.docks.map(d=>{const t=d.truck;return{id:d.id,dir:d.dir,open:d.dir==='out'||doorIdx(d)<CFG.inDoors,truck:t?(d.dir==='in'?{id:t.id,shipment:t.ship,carrier:t.carrier,status:t.status,unloaded:t.done+'/'+t.pallets,minsRemainingIfFlowing:Math.round(remainMin(t)),crossdock:t.crossdock}:{id:t.id,route:t.route,status:t.status,loaded:t.loaded+'/'+t.needed,cutoff:fmt(t.cutoff),projectedFinish:fmt(outProjection(t))}):null}}),
+    yardQueueInOrder:yardQueue().map(t=>({id:t.id,shipment:t.ship,appointment:fmt(t.appt),arrived:fmt(t.arrivedAt),minsWaiting:Math.round(S.t-t.arrivedAt),prioritized:t.prio,urgentSkusForEcomWave:!!t.urgent})),
+    scheduledArrivals:S.upcoming.filter(t=>t.status==='scheduled').map(t=>({id:t.id,shipment:t.ship,appointment:fmt(t.appt),eta:fmt(t.eta)})),
+    recentlyReceived:S.history.slice(-4).map(t=>({id:t.id,shipment:t.ship,dock:t.dock,completed:fmt(t.leftAt)})),
+    forklifts:S.fl.map(f=>({id:f.id,role:f.role==='put'?'putaway':'picking',state:f.down?(f.repairAt!=null?'down, battery swap until '+fmt(f.repairAt):'down, battery fault'):f.state,battery:Math.round(f.bat),aisle:aisleOf(f)?aisleOf(f).id:null})),
+    aisles:AISLES.map(a=>({id:'AISLE-'+a.id,blockedBySpill:a.spill,congestion:+a.cong.toFixed(2),bypassedUntil:a.avoidUntil?fmt(a.avoidUntil):null,slotFillPct:Math.round(aisleFill(a)*100)})),
+    kpis:kpiData()};
+}
+function buildPrompt(q,local,allowed,history){
+  return 'You are the operations copilot embedded in a live 3D warehouse digital twin (Sidoarjo DC-01). Answer the operator using ONLY the snapshot and diagnostics below; never invent numbers or entities.\n'+
+  'Style: lead with the direct answer, then the causal chain from symptom back to root cause, quantified with figures from the snapshot, then what to do. Max 130 words. Use "- " at line start for bullet lines and **double asterisks** for emphasis. Reply in the same language as the question (Indonesian question means Indonesian answer).\n'+
+  'Return ONLY JSON: {"answer": string, "highlight": [entity ids from the snapshot to light up in the 3D twin, include every link of the chain], "actions": [keys chosen only from AVAILABLE_ACTIONS that would actually help; may be empty]}\n\n'+
+  'SNAPSHOT: '+JSON.stringify(snapshot())+'\n\nRULES-ENGINE DIAGNOSIS (verified, use it): '+JSON.stringify({text:local.text,entities:local.ids})+
+  '\n\nAVAILABLE_ACTIONS: '+JSON.stringify(allowed.map(k=>({key:k,label:action(k).label})))+
+  (history.length?'\n\nRECENT CONVERSATION: '+JSON.stringify(history):'')+'\n\nQUESTION: '+q;
+}
+function allowedActions(local){
+  const set=new Set(local.acts);const c=ctx();
+  c.down.forEach(f=>{if(f.repairAt==null)set.add('battery:'+f.id)});
+  c.cong.forEach(a=>{if(!a.avoidUntil)set.add('reroute:'+a.id)});
+  yardQueue().forEach((t,i)=>{if(i>0&&i<4)set.add('prioritize:'+t.id);if((t.urgent||(S.surge&&i<2))&&!t.crossdock)set.add('crossdock:'+t.id)});
+  S.fl.forEach(f=>{if(!f.down)set.add('reassign:'+f.id+':'+(f.role==='put'?'pick':'put'))});
+  return[...set].filter(k=>!S.applied.has(k)&&action(k));
+}
+
+/* ---------- chat UI ---------- */
+const chatEl=$('#chat');const convo=[];
+function richText(t){
+  const lines=String(t).split('\n').map(x=>x.trim()).filter(Boolean);let h='',inList=false;
+  const fl=x=>esc(x).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  lines.forEach(l=>{if(/^[-•]\s+/.test(l)){if(!inList){h+='<ul>';inList=true}h+='<li>'+fl(l.replace(/^[-•]\s+/,''))+'</li>'}else{if(inList){h+='</ul>';inList=false}h+='<p>'+fl(l)+'</p>'}});
+  if(inList)h+='</ul>';return h;
+}
+function addMsg(role,html){const d=document.createElement('div');d.className='msg '+role;d.innerHTML=html;chatEl.appendChild(d);chatEl.scrollTop=chatEl.scrollHeight;return d}
+function finish(el,out,src){
+  el.innerHTML=richText(out.text);const ids=out.ids;setHL(ids);focusOn(ids);
+  if(out.acts.length){const box=document.createElement('div');box.className='acts';out.acts.slice(0,4).forEach(k=>{const a=action(k);if(!a)return;const b=document.createElement('button');b.textContent=(S.applied.has(k)?'Applied: ':'Approve: ')+a.label;b.disabled=S.applied.has(k);b.onclick=()=>{a.run();S.applied.add(k);b.textContent='Applied: '+a.label;b.disabled=true};box.appendChild(b)});el.appendChild(box)}
+  const m=document.createElement('div');m.className='meta';m.innerHTML='<span>'+esc(src)+' at '+fmt(S.t)+'</span>';
+  if(ids.length){const b=document.createElement('button');b.className='linkbtn';b.textContent='Show in twin';b.onclick=()=>{setHL(ids);focusOn(ids)};m.appendChild(b)}
+  el.appendChild(m);chatEl.scrollTop=chatEl.scrollHeight;
+}
+let busy=false;
+async function ask(q){
+  q=q.trim();if(!q||busy)return;busy=true;
+  addMsg('user',esc(q));const el=addMsg('ai','<span class="thinking">Reading the twin…</span>');
+  const local=localAnswer(q);local.ids=[...new Set(local.ids)];local.acts=[...new Set(local.acts)].filter(k=>!S.applied.has(k));
+  const sample=await Promise.race([samplerP,new Promise(r=>setTimeout(()=>r(undefined),1500))]);
+  if(sample&&!sampleOff){
+    try{
+      const allowed=allowedActions(local);
+      const res=await sample.json(buildPrompt(q,local,allowed,convo.slice(-4)),{modelTier:'quick',cache:false});
+      const known=knownIds();
+      const out={text:res&&typeof res.answer==='string'&&res.answer.trim()?res.answer:local.text,
+        ids:res&&Array.isArray(res.highlight)?res.highlight.filter(i=>known.has(i)):local.ids,
+        acts:res&&Array.isArray(res.actions)?res.actions.filter(k=>allowed.includes(k)):[]};
+      if(!out.ids.length)out.ids=local.ids;
+      finish(el,out,'Claude');convo.push({q,a:out.text});busy=false;return;
+    }catch(e){if(e&&(e.code==='not_granted'||e.code==='unavailable'))sampleOff=true;$('#cpsrc').textContent=sampleOff?'Claude is not allowed in this view; using the rules engine.':'Claude did not answer; this one came from the rules engine.'}
+  }
+  finish(el,local,'Rules engine');convo.push({q,a:local.text});busy=false;
+}
+$('#askf').addEventListener('submit',e=>{e.preventDefault();const v=$('#q').value;$('#q').value='';ask(v)});
+$('#chips').addEventListener('click',e=>{if(e.target.tagName==='BUTTON')ask(e.target.textContent)});
+function setHL(ids){S.hl={ids:new Set(ids),until:performance.now()+14000}}
+const isHL=id=>S.hl&&performance.now()<S.hl.until&&S.hl.ids.has(id);
+
+/* ================= 3D ================= */
+const X=x=>(x-500)/10, Z=y=>(y-330)/10;
+const DOOR_Z=21.8, LANE_V=66, ROAD_Z=74, SHOULDER_Z=81.5, SLOT_X=[-13,-5.5,2], SLOT_Z=44, FLOOR_Y=.3;
+const G={ok:false,picks:[],vis:new Map(),fls:new Map(),walls:[],roofOn:false,cam:{az:.72,el:.66,zoom:1.12,tx:-2,tz:16},camT:null};
+const doorX=id=>X(S.docks.find(d=>d.id===id).x);
+const BOXG=typeof THREE!=='undefined'?new THREE.BoxGeometry(1,1,1):null;
+const matCache={};
+function M(c,o){const k=c+'|'+JSON.stringify(o||{});if(!matCache[k])matCache[k]=new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.85,metalness:.05},o||{}));return matCache[k]}
+function box(w,h,d,m,x,y,z,parent,cast=true){const g=new THREE.Mesh(BOXG,m);g.scale.set(w,h,d);g.position.set(x,y,z);g.castShadow=cast;g.receiveShadow=true;(parent||G.scene).add(g);return g}
+function glowTex(){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');const r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,'rgba(255,244,220,1)');r.addColorStop(.22,'rgba(255,220,160,.55)');r.addColorStop(1,'rgba(255,200,120,0)');g.fillStyle=r;g.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)}
+function rectLines(x1,z1,x2,z2,y,col,w=.18){const m=M(col,{emissive:col,emissiveIntensity:.35});const g=new THREE.Group();box(x2-x1,.04,w,m,(x1+x2)/2,y,z1,g,false);box(x2-x1,.04,w,m,(x1+x2)/2,y,z2,g,false);box(w,.04,z2-z1,m,x1,y,(z1+z2)/2,g,false);box(w,.04,z2-z1,m,x2,y,(z1+z2)/2,g,false);G.scene.add(g);return g}
+function pickPlane(id,x1,z1,x2,z2,y){const m=new THREE.MeshBasicMaterial({color:0xF2B33D,transparent:true,opacity:0,depthWrite:false});const p=new THREE.Mesh(new THREE.PlaneGeometry(x2-x1,z2-z1),m);p.rotation.x=-Math.PI/2;p.position.set((x1+x2)/2,y,(z1+z2)/2);p.userData.id=id;G.scene.add(p);G.picks.push(p);return p}
+
+function init3D(){
+  if(typeof THREE==='undefined'){$('#stage').insertAdjacentHTML('beforeend','<div class="nogl">The 3D engine could not load. The copilot, tables and timeline still run.</div>');return}
+  const canvas=$('#scene3d');
+  let r;try{r=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'})}catch(e){$('#stage').insertAdjacentHTML('beforeend','<div class="nogl">WebGL is not available in this browser, so the 3D view is off. The copilot, tables and timeline still run.</div>');return}
+  G.r=r;r.setPixelRatio(Math.min(2,window.devicePixelRatio||1));r.shadowMap.enabled=true;r.shadowMap.type=THREE.PCFSoftShadowMap;r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.0;
+  const rootT=document.documentElement.dataset.theme,night=rootT==='dark'||(rootT!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);G.night=night;
+  const P=night?{bg:0x0b1016,ground:0x0f141a,apron:0x1d232b,road:0x0c0f13,slab:0x2c333c,floor:0x343c46,hemi:[0x7f95bb,0x080b10,.55],sun:[0xbfd0ff,.6],exp:1.05,pool:.22,glow:.9}
+           :{bg:0xa9b2ba,ground:0x8f968c,apron:0xb8bab3,road:0x464b51,slab:0x868c92,floor:0xb1b3ad,hemi:[0xe6eef6,0x5f645b,.85],sun:[0xfff2dc,1.35],exp:1.0,pool:0,glow:.12};G.P=P;
+  const sc=G.scene=new THREE.Scene();sc.background=new THREE.Color(P.bg);r.toneMappingExposure=night?1.05:1.0;$('#stage').style.background='#'+P.bg.toString(16).padStart(6,'0');
+  G.camera=new THREE.OrthographicCamera(-1,1,1,-1,-600,1600);
+  sc.add(new THREE.HemisphereLight(G.P.hemi[0],G.P.hemi[1],G.P.hemi[2]));
+  const moon=new THREE.DirectionalLight(G.P.sun[0],G.P.sun[1]);moon.position.set(-70,130,60);moon.castShadow=true;moon.shadow.mapSize.set(2048,2048);
+  Object.assign(moon.shadow.camera,{left:-115,right:115,top:115,bottom:-115,near:1,far:420});moon.shadow.bias=-.0006;sc.add(moon);sc.add(moon.target);
+  [[-25,-10],[25,-10]].forEach(([x,z])=>{const p=new THREE.PointLight(0xffefd2,.9,95,1.4);p.position.set(x,16,z);sc.add(p)});
+  const GT=glowTex();G.glowTex=GT;
+  // ground, apron, road
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(700,700),M(G.P.ground));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;sc.add(ground);
+  box(130,.06,50,M(G.P.apron),0,.03,46,null,false);
+  box(500,.08,9,M(G.P.road,{roughness:.95}),0,.04,ROAD_Z,null,false);
+  const dash=new THREE.InstancedMesh(BOXG,M(0xbfc6cf,{emissive:0x5a6068,emissiveIntensity:.4}),40);const mm=new THREE.Matrix4();
+  for(let i=0;i<40;i++){mm.compose(new THREE.Vector3(-240+i*12.5,.1,ROAD_Z),new THREE.Quaternion(),new THREE.Vector3(5,.02,.25));dash.setMatrixAt(i,mm)}sc.add(dash);
+  box(500,.03,.2,M(0x8c949e),0,.1,ROAD_Z-4.3,null,false);box(500,.03,.2,M(0x8c949e),0,.1,ROAD_Z+4.3,null,false);
+  // door bay lines and yard stalls
+  const lineM=M(0xd0d6dd,{emissive:0x4a5058,emissiveIntensity:.5});
+  [...IN_X,...OUT_X].forEach(x=>{[-3.5,3.5].forEach(o=>box(.15,.03,15,lineM,X(x)+o,.1,DOOR_Z+8.5,null,false))});
+  SLOT_X.forEach(x=>{[-3.6,3.6].forEach(o=>box(.15,.03,16,lineM,x+o,.1,SLOT_Z+8,null,false))});
+  // building
+  box(100,.6,53,M(G.P.slab),0,0,-5.5,null,false);
+  box(98.6,.05,51.6,M(G.P.floor,{roughness:.7}),0,FLOOR_Y+.01,-5.5,null,false);
+  const wallDefs=[{n:[0,-1],w:100,d:.5,x:0,z:-32},{n:[0,1],w:100,d:.5,x:0,z:21},{n:[-1,0],w:.5,d:53,x:-50,z:-5.5},{n:[1,0],w:.5,d:53,x:50,z:-5.5}];
+  wallDefs.forEach(wd=>{const m=new THREE.MeshStandardMaterial({color:0x3b4450,roughness:.9,transparent:true,opacity:1});const w=box(wd.w,10,wd.d,m,wd.x,5.3,wd.z);w.userData.n=wd.n;G.walls.push(w)});
+  box(100,1.2,1.4,M(0x262c34),0,.6,21.6);// dock plinth
+  G.roof=new THREE.Group();box(101,.6,54,M(0x2a313a),0,10.6,-5.5,G.roof);[-30,-10,10,30].forEach(x=>box(9,.15,30,M(0x3d5a7c,{emissive:0x22334a,emissiveIntensity:.5}),x,11,-8,G.roof,false));G.roof.visible=false;sc.add(G.roof);
+  // office annex with lit windows
+  box(15,6,17,M(0x38414c),57.5,3,12.5);for(let i=0;i<4;i++)box(2.2,1.3,.1,M(0xffd27a,{emissive:0xffc860,emissiveIntensity:1.6}),52+i*3.6,3.6,21.06,null,false);
+  // doors
+  G.doors={};
+  S.docks.forEach(d=>{const x=X(d.x),g=new THREE.Group();
+    box(4.2,4.6,.4,M(0x1a1f26),0,3.4,0,g);const door=box(3.3,3.8,.2,M(0x4a5462,{metalness:.3,roughness:.6}),0,3.3,.25,g);
+    for(let k=0;k<5;k++)box(3.3,.05,.05,M(0x2a313b),0,1.7+k*.75,.37,g,false);
+    const light=box(.5,.3,.25,new THREE.MeshStandardMaterial({color:0x333333,emissive:0x45c483,emissiveIntensity:2}),1.2,6.0,.3,g,false);
+    const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:GT,color:0x45c483,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:.6}));glow.scale.set(3,3,1);glow.position.set(1.2,6,.6);g.add(glow);
+    box(3.6,.25,1.5,M(0x5b636d,{metalness:.4}),0,1.15,1.0,g,false);
+    g.position.set(x,0,21.25);door.userData.id=d.id;g.children.forEach(c=>c.userData.id=d.id);G.picks.push(...g.children.filter(c=>c.isMesh));sc.add(g);G.doors[d.id]={g,light,glow}});
+  // floor tape lane + zones
+  const tapeM=M(0xE2A800,{emissive:0x7a5a00,emissiveIntensity:.6});
+  const ti=new THREE.InstancedMesh(BOXG,tapeM,2*48);let k=0;[Z(LANE)-1.4,Z(LANE)+1.4].forEach(z=>{for(let i=0;i<48;i++){mm.compose(new THREE.Vector3(-47+i*2,FLOOR_Y+.04,z),new THREE.Quaternion(),new THREE.Vector3(1.3,.02,.2));ti.setMatrixAt(k++,mm)}});sc.add(ti);
+  G.zoneIn=rectLines(X(34),Z(444),X(306),Z(518),FLOOR_Y+.05,0x7f8a98);
+  G.zoneOut=rectLines(X(594),Z(444),X(966),Z(518),FLOOR_Y+.05,0x7f8a98);
+  rectLines(X(340),Z(444),X(560),Z(518),FLOOR_Y+.05,0x4f5a68);
+  rectLines(X(20),Z(62),X(120),Z(202),FLOOR_Y+.05,0x45c483);
+  for(let i=0;i<3;i++){box(1.2,2,1,M(0x2a313a),X(30),FLOOR_Y+1,Z(80+i*45));box(.3,.3,.08,M(0x111111,{emissive:0x45c483,emissiveIntensity:2}),X(30)+.4,FLOOR_Y+1.5,Z(80+i*45)+.52,null,false)}
+  G.zp={IN:pickPlane('IN-STAGE',X(34),Z(444),X(306),Z(518),FLOOR_Y+.08),OUT:pickPlane('OUT-STAGE',X(594),Z(444),X(966),Z(518),FLOOR_Y+.08),YARD:pickPlane('YARD',-17,SLOT_Z-1,6,SLOT_Z+17,.12),CHG:pickPlane('CHG',X(20),Z(62),X(120),Z(202),FLOOR_Y+.08)};
+  // racks
+  const up=new THREE.InstancedMesh(BOXG,M(0x2f62a8,{metalness:.4,roughness:.5}),RACKS.length*9*2),bm=new THREE.InstancedMesh(BOXG,M(0xd9822b,{metalness:.3,roughness:.5}),RACKS.length*2*3);let ui=0,bi=0;
+  RACKS.forEach(rx=>{const x0=X(rx)+.1,x1=X(rx)+3.9;for(let b=0;b<=BAYS;b++){[x0,x1].forEach(x=>{mm.compose(new THREE.Vector3(x,FLOOR_Y+3.6,Z(BY0+b*BH)),new THREE.Quaternion(),new THREE.Vector3(.16,7.2,.16));up.setMatrixAt(ui++,mm)})}
+    [2.45,4.65,6.85].forEach(y=>[x0,x1].forEach(x=>{mm.compose(new THREE.Vector3(x,FLOOR_Y+y,Z(BY0+BAYS*BH/2)),new THREE.Quaternion(),new THREE.Vector3(.14,.2,32));bm.setMatrixAt(bi++,mm)}))});
+  up.castShadow=bm.castShadow=true;sc.add(up,bm);
+  G.loads=new THREE.InstancedMesh(BOXG,M(0xffffff,{roughness:.9}),RACKS.length*BAYS*3);G.loads.castShadow=true;G.loads.receiveShadow=true;
+  G.loadCol=[];for(let i=0;i<RACKS.length*BAYS*3;i++){const c=new THREE.Color().setHSL(.08+rnd()*.03,.38+rnd()*.15,.42+rnd()*.12);G.loadCol.push(c);G.loads.setColorAt(i,c)}
+  sc.add(G.loads);
+  G.low=new THREE.InstancedMesh(BOXG,M(0xEE6A5C,{emissive:0xEE6A5C,emissiveIntensity:.9}),RACKS.length*BAYS);sc.add(G.low);
+  // aisle overlays
+  G.aisles={};AISLES.forEach(a=>{const x=X(a.x),z=Z(BY0+BAYS*BH/2);
+    const cong=new THREE.Mesh(new THREE.PlaneGeometry(5.6,32),new THREE.MeshBasicMaterial({color:0xEE6A5C,transparent:true,opacity:0,depthWrite:false}));cong.rotation.x=-Math.PI/2;cong.position.set(x,FLOOR_Y+.06,z);sc.add(cong);
+    const hit=pickPlane('AISLE-'+a.id,x-3,Z(BY0),x+3,Z(BY0+BAYS*BH),FLOOR_Y+.1);
+    const avoid=rectLines(x-2.8,Z(BY0),x+2.8,Z(BY0+BAYS*BH),FLOOR_Y+.07,0xF2B33D,.25);avoid.visible=false;
+    const spill=new THREE.Group();const pud=new THREE.Mesh(new THREE.CircleGeometry(1.8,24),new THREE.MeshStandardMaterial({color:0x8fb5d8,roughness:.1,metalness:.2,transparent:true,opacity:.7}));pud.rotation.x=-Math.PI/2;pud.position.y=FLOOR_Y+.08;spill.add(pud);
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(.45,1.2,12),M(0xff6a2b,{emissive:0xff4a10,emissiveIntensity:.6}));cone.position.set(1.2,FLOOR_Y+.6,1.4);spill.add(cone);spill.position.set(x,0,Z(220));spill.visible=false;sc.add(spill);
+    G.aisles[a.id]={cong,hit,avoid,spill}});
+  // staging pallets
+  G.inP=new THREE.InstancedMesh(BOXG,M(0xc0915c),48);G.outP=new THREE.InstancedMesh(BOXG,M(0x8fb0d8),64);G.inP.castShadow=G.outP.castShadow=true;sc.add(G.inP,G.outP);
+  // lamps
+  [[-58,64],[-22,64],[16,64],[50,64],[-30,30],[30,30]].forEach(([x,z],i)=>{const p=box(.3,9,.3,M(0x30363e),x,4.5,z);p.castShadow=false;box(1.6,.3,.6,M(0xfff1d6,{emissive:0xffe2b0,emissiveIntensity:2.2}),x+.6,9,z,null,false);
+    const s=new THREE.Sprite(new THREE.SpriteMaterial({map:GT,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:G.P.glow}));s.scale.set(9,9,1);s.position.set(x+.6,9,z);sc.add(s);
+    const pool=new THREE.Mesh(new THREE.CircleGeometry(12,32),new THREE.MeshBasicMaterial({map:GT,color:0xffd8a0,transparent:true,opacity:G.P.pool,blending:THREE.AdditiveBlending,depthWrite:false}));pool.visible=G.night;pool.rotation.x=-Math.PI/2;pool.position.set(x+.6,.14,z);sc.add(pool);
+    if(i<4&&G.night){const pl=new THREE.PointLight(0xffd9a6,1.1,40,2);pl.position.set(x+.6,8.5,z);sc.add(pl)}});
+  // trees and fence
+  [[72,-25],[76,-10],[71,5],[78,22],[70,40],[-72,-20],[-76,0],[-70,30]].forEach(([x,z])=>{box(.4,2,.4,M(0x3a2c22),x,1,z);const c=new THREE.Mesh(new THREE.SphereGeometry(2.6,12,10),M(0x1d3a2a));c.position.set(x,3.6,z);c.castShadow=true;sc.add(c)});
+  const fm=M(0x3a434e);for(let x=-64;x<=66;x+=4)box(.12,1.6,.12,fm,x,.8,68.5,null,false);box(130,.08,.08,fm,1,1.5,68.5,null,false);
+  // highlight rings
+  G.rings=[];for(let i=0;i<24;i++){const m=new THREE.Mesh(new THREE.RingGeometry(.86,1,48),new THREE.MeshBasicMaterial({color:0xF2B33D,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.visible=false;sc.add(m);G.rings.push(m)}
+  G.ray=new THREE.Raycaster();
+  bindControls();resize();new ResizeObserver(resize).observe($('#stage'));
+  G.ok=true;
+}
+function resize(){if(!G.r)return;const el=$('#stage'),w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;G.r.setSize(w,h,false);G.w=w;G.h=h;updateCam()}
+function updateCam(){const c=G.cam,cam=G.camera,a=G.w/G.h||1.6,hh=62;cam.left=-hh*a;cam.right=hh*a;cam.top=hh;cam.bottom=-hh;cam.zoom=c.zoom;cam.updateProjectionMatrix();
+  cam.position.set(c.tx+300*Math.cos(c.el)*Math.sin(c.az),300*Math.sin(c.el),c.tz+300*Math.cos(c.el)*Math.cos(c.az));cam.lookAt(c.tx,0,c.tz)}
+function bindControls(){
+  const cv=$('#scene3d'),pts=new Map();let mode=null,lx=0,ly=0,moved=0,pinch=0;
+  cv.addEventListener('contextmenu',e=>e.preventDefault());
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;lx=e.clientX;ly=e.clientY;
+    mode=(e.button===2||e.shiftKey)?'pan':'rot';if(pts.size===2){mode='pinch';const[a,b]=[...pts.values()];pinch=Math.hypot(a.x-b.x,a.y-b.y)}cv.classList.add('dragging');G.camT=null});
+  cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);const c=G.cam;
+    if(mode==='pinch'&&pts.size===2){const[a,b]=[...pts.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch)c.zoom=Math.min(5,Math.max(.45,c.zoom*d/pinch));pinch=d}
+    else if(mode==='rot'){c.az-=dx*.006;c.el=Math.min(1.35,Math.max(.32,c.el+dy*.004))}
+    else if(mode==='pan'){const u=(124/c.zoom)/G.h;c.tx-=Math.cos(c.az)*dx*u;c.tz+=Math.sin(c.az)*dx*u;const f=u/Math.sin(c.el);c.tx-=Math.sin(c.az)*dy*f;c.tz-=Math.cos(c.az)*dy*f}
+    updateCam()});
+  const end=e=>{const was=pts.has(e.pointerId);pts.delete(e.pointerId);if(pts.size<2)pinch=0;cv.classList.remove('dragging');if(was&&moved<6&&e.type==='pointerup')pick(e)};
+  cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+  cv.addEventListener('wheel',e=>{e.preventDefault();G.cam.zoom=Math.min(5,Math.max(.45,G.cam.zoom*Math.exp(-e.deltaY*.0012)));updateCam()},{passive:false});
+  $('#zin').onclick=()=>{G.cam.zoom=Math.min(5,G.cam.zoom*1.25);updateCam()};
+  $('#zout').onclick=()=>{G.cam.zoom=Math.max(.45,G.cam.zoom/1.25);updateCam()};
+  $('#rot').onclick=()=>{G.camT={az:G.cam.az+Math.PI/2}};
+  $('#home').onclick=()=>{G.camT={az:.72,el:.66,zoom:1.12,tx:-2,tz:16}};
+  $('#roof').onclick=()=>{G.roofOn=!G.roofOn;$('#roof').setAttribute('aria-pressed',G.roofOn);G.roof.visible=G.roofOn};
+}
+function pick(e){
+  const rect=$('#scene3d').getBoundingClientRect();const v=new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
+  G.ray.setFromCamera(v,G.camera);const objs=[...G.picks];G.vis.forEach(t=>objs.push(t.mesh));G.fls.forEach(m=>objs.push(m));
+  const hits=G.ray.intersectObjects(objs,true);
+  for(const h of hits){let o=h.object;while(o&&!o.userData.id)o=o.parent;if(o&&o.userData.id){select(o.userData.id);return}}
+}
+function entityPos(id){
+  if(!G.ok)return null;
+  if(/^FL-/.test(id)){const f=S.fl.find(x=>x.id===id);return f?{x:X(f.x),z:Z(f.y),r:2.2}:null}
+  if(/^D\d$/.test(id))return{x:doorX(id),z:DOOR_Z+.5,r:3}
+  if(/^AISLE-/.test(id)){const a=AISLES.find(x=>x.id===id.slice(6));return{x:X(a.x),z:Z(220),r:0}}
+  const z={'IN-STAGE':[X(170),Z(481)],'OUT-STAGE':[X(780),Z(481)],'YARD':[-5.5,SLOT_Z+8],'CHG':[X(70),Z(132)]}[id];if(z)return{x:z[0],z:z[1],r:0};
+  const v=G.vis.get(id);if(v)return{x:v.pos.x+Math.sin(v.ang)*8,z:v.pos.z+Math.cos(v.ang)*8,r:9};
+  return null;
+}
+function focusOn(ids){if(!G.ok)return;const ps=ids.map(entityPos).filter(Boolean);if(!ps.length)return;const x=ps.reduce((s,p)=>s+p.x,0)/ps.length,z=ps.reduce((s,p)=>s+p.z,0)/ps.length;G.camT={tx:x,tz:z,zoom:Math.max(G.cam.zoom,1.15)}}
+
+/* ---- trucks ---- */
+const PAINT=[{t:0xd8dce2,c:0xe9ecef},{t:0x8f2d27,c:0x2d3038},{t:0xc9ced6,c:0x2f5ea8},{t:0x3b5d7c,c:0xd8dce2}];
+const WHEELG=typeof THREE!=='undefined'?new THREE.CylinderGeometry(.55,.55,.45,14):null;
+function wheel(g,x,z){const w=new THREE.Mesh(WHEELG,M(0x15171b));w.rotation.z=Math.PI/2;w.position.set(x,.55,z);g.add(w)}
+function mkTruck(tr){
+  const g=new THREE.Group(),p=PAINT[tr.paint||0];
+  box(2.6,3.3,12.6,M(p.t,{roughness:.6}),0,2.8,6.6,g);
+  box(2.62,.12,12.62,M(0x9aa3ad,{metalness:.5}),0,4.47,6.6,g,false);
+  box(2.2,.35,12.4,M(0x1a1d22),0,1.0,6.6,g,false);
+  [1.4,2.8].forEach(z=>[-1.05,1.05].forEach(x=>wheel(g,x,z)));
+  box(2.5,2.6,3.0,M(p.c,{roughness:.5,metalness:.2}),0,2.45,14.7,g);
+  box(2.5,.9,1.4,M(p.c,{roughness:.5,metalness:.2}),0,4.2,14.1,g);
+  box(2.3,1.0,.08,M(0x0e1a26,{roughness:.15,metalness:.6}),0,3.15,16.22,g,false);
+  [13.9,15.6].forEach(z=>[-1.05,1.05].forEach(x=>wheel(g,x,z)));
+  [-.85,.85].forEach(x=>box(.5,.32,.1,M(0xfff3d6,{emissive:0xfff0c8,emissiveIntensity:2.4}),x,1.45,16.25,g,false));
+  [-1,1].forEach(x=>box(.35,.22,.08,M(0xff3b30,{emissive:0xff2a1f,emissiveIntensity:2}),x,1.5,.28,g,false));
+  const beam=new THREE.Mesh(new THREE.ConeGeometry(3.2,11,20,1,true),new THREE.MeshBasicMaterial({color:0xfff0c8,transparent:true,opacity:.1,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  beam.rotation.x=-Math.PI/2;beam.scale.set(1,1,.32);beam.position.set(0,1.3,21.8);beam.visible=false;g.add(beam);g.userData.beam=beam;
+  g.userData.id=tr.id;g.traverse(o=>{if(o.isMesh&&o!==beam)o.castShadow=true});
+  return g;
+}
+function targetKey(tr,qi){if(tr.status==='departing')return'exit';if(tr.dock&&['docking','unloading','loading','stalled','waiting'].includes(tr.status))return'door:'+tr.dock;if(tr.status==='yard')return qi<3?'slot:'+qi:'shoulder:'+(qi-3);return'exit'}
+function plan(v,key){
+  const pts=[];let cx=v.pos.x,cz=v.pos.z;
+  if(cz<LANE_V-2){pts.push({x:cx,z:LANE_V});cz=LANE_V}
+  if(key==='exit'){pts.push({x:cx+10,z:ROAD_Z},{x:170,z:ROAD_Z});return pts}
+  const[k,a]=key.split(':');
+  if(k==='shoulder'){const tx=-34-(+a)*19;if(cz>ROAD_Z+3){pts.push({x:cx+8,z:ROAD_Z})}pts.push({x:tx-8,z:ROAD_Z},{x:tx,z:SHOULDER_Z});return pts}
+  let tx,tz,side;
+  if(k==='door'){tx=doorX(a);tz=DOOR_Z;side=S.docks.find(d=>d.id===a).dir==='in'?-1:1}else{tx=SLOT_X[+a];tz=SLOT_Z;side=cx<=tx?1:-1}
+  if(cz>ROAD_Z+3)pts.push({x:cx+8,z:ROAD_Z});
+  pts.push({x:tx+side*12,z:LANE_V},{x:tx,z:tz+13,rev:true},{x:tx,z:tz,rev:true});return pts;
+}
+function angTo(a,b,maxStep){let d=((b-a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;if(Math.abs(d)<=maxStep)return b;return a+Math.sign(d)*maxStep}
+function updateTrucks(dtR){
+  if(!G.ok){S.docks.forEach(d=>{if(d.truck&&d.truck.status==='docking')d.truck.atDoor=true});return}
+  const seen=new Set();
+  const handle=(t,key)=>{seen.add(t.id);let v=G.vis.get(t.id);
+    if(!v){v={tr:t,mesh:mkTruck(t),pos:{x:-170,z:ROAD_Z},ang:Math.PI/2,route:[],key:null};
+      if(t.atDoor&&key.startsWith('door:')){v.pos={x:doorX(t.dock),z:DOOR_Z};v.ang=0;v.key=key}
+      G.scene.add(v.mesh);G.vis.set(t.id,v)}
+    v.tr=t;if(v.key!==key){v.key=key;v.route=plan(v,key);if(key.startsWith('door:'))t.atDoor=false}};
+  S.docks.forEach(d=>{if(d.truck)handle(d.truck,targetKey(d.truck))});yardQueue().forEach((t,i)=>handle(t,targetKey(t,i)));
+  G.vis.forEach((v,id)=>{if(!seen.has(id)&&v.key!=='exit'){v.key='exit';v.route=plan(v,'exit')}});
+  const sm=S.speed?Math.min(5,Math.max(1,Math.sqrt(S.speed))):0,sp=15*sm*dtR,rs=3*sm*dtR;
+  G.vis.forEach((v,id)=>{
+    let budget=sp;v.moving=false;
+    while(budget>0&&v.route.length){const p=v.route[0],dx=p.x-v.pos.x,dz=p.z-v.pos.z,d=Math.hypot(dx,dz);if(d<.01){v.route.shift();continue}
+      const mx=dx/d,mz=dz/d,want=p.rev?Math.atan2(-mx,-mz):Math.atan2(mx,mz);v.ang=angTo(v.ang,want,rs);
+      const s=Math.min(d,budget);v.pos.x+=mx*s;v.pos.z+=mz*s;budget-=s;v.moving=true;v.rev=!!p.rev;if(s>=d)v.route.shift();break}
+    if(!v.route.length){if(v.key.startsWith('door:')){v.tr.atDoor=true;v.ang=angTo(v.ang,0,rs)}else if(v.key.startsWith('slot:'))v.ang=angTo(v.ang,0,rs);else if(v.key==='exit'){G.scene.remove(v.mesh);G.vis.delete(id);return}}
+    v.mesh.position.set(v.pos.x,0,v.pos.z);v.mesh.rotation.y=v.ang;v.mesh.userData.beam.visible=G.night&&v.moving&&!v.rev;
+  });
+}
+/* ---- forklifts ---- */
+function mkForklift(f){
+  const g=new THREE.Group(),body=new THREE.MeshStandardMaterial({color:0xE8A317,roughness:.55,metalness:.2});
+  box(1.9,.7,1.2,body,0,.6,0,g);box(.6,1.0,1.2,body,-.75,1.0,0,g);
+  box(.5,.5,.6,M(0x1d2026),-.1,1.15,0,g,false);
+  [[-.7,.5],[-.7,-.5],[.55,.5],[.55,-.5]].forEach(([x,z])=>box(.07,1.4,.07,M(0x22262c),x,1.65,z,g,false));
+  box(1.4,.07,1.1,M(0x22262c),-.07,2.35,0,g,false);
+  [-.35,.35].forEach(z=>box(.1,2.6,.1,M(0x30353c,{metalness:.5}),1.0,1.5,z,g,false));
+  [-.3,.3].forEach(z=>box(1.2,.06,.14,M(0x50565e,{metalness:.6}),1.65,.25,z,g,false));
+  const beacon=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),new THREE.MeshStandardMaterial({color:0x222,emissive:0xff9a1f,emissiveIntensity:2}));beacon.position.set(-.4,2.5,0);g.add(beacon);
+  const load=box(1.3,1.0,1.2,M(0xc0915c),1.7,.85,0,g);load.visible=false;
+  [[-.6,.62],[-.6,-.62],[.6,.62],[.6,-.62]].forEach(([x,z])=>{const w=new THREE.Mesh(WHEELG,M(0x15171b));w.scale.set(.6,.5,.6);w.rotation.x=Math.PI/2;w.position.set(x,.33,z);g.add(w)});
+  g.userData={id:f.id,body,beacon,load};g.traverse(o=>{if(o.isMesh)o.castShadow=true});
+  return g;
+}
+function updateForklifts(now){
+  const alive=new Set(S.fl.map(f=>f.id));
+  G.fls.forEach((m,id)=>{if(!alive.has(id)){G.scene.remove(m);G.fls.delete(id)}});
+  S.fl.forEach(f=>{let m=G.fls.get(f.id);if(!m){m=mkForklift(f);G.scene.add(m);G.fls.set(f.id,m)}
+    m.position.set(X(f.x),FLOOR_Y,Z(f.y));m.rotation.y=-f.ang;
+    const u=m.userData;u.load.visible=f.carrying;u.body.color.setHex(f.down?0xC8443A:0xE8A317);
+    u.beacon.material.emissive.setHex(f.down?0xff2a1f:0xff9a1f);u.beacon.material.emissiveIntensity=f.down||f.state==='travel'?(Math.sin(now/120)>0?2.5:.2):.3});
+}
+/* ---- floor state ---- */
+const mm4=typeof THREE!=='undefined'?new THREE.Matrix4():null,Q0=typeof THREE!=='undefined'?new THREE.Quaternion():null;
+function updateFloor(now){
+  let i=0,li=0;
+  RACKS.forEach((rx,ri)=>{for(let b=0;b<BAYS;b++){const v=fill[ri][b],n=v<.12?0:Math.max(1,Math.round(v*3));
+    for(let l=0;l<3;l++){const vis=l<n;mm4.compose(new THREE.Vector3(X(rx)+2,FLOOR_Y+[0,2.55,4.75][l]+.95,Z(BY0+b*BH+BH/2)),Q0,vis?new THREE.Vector3(3.1,1.7,3.2):new THREE.Vector3(0,0,0));G.loads.setMatrixAt(i++,mm4)}
+    mm4.compose(new THREE.Vector3(X(rx)+2,FLOOR_Y+.05,Z(BY0+b*BH+BH/2)),Q0,v<.12?new THREE.Vector3(3.2,.04,3.4):new THREE.Vector3(0,0,0));G.low.setMatrixAt(li++,mm4)}});
+  G.loads.instanceMatrix.needsUpdate=true;G.low.instanceMatrix.needsUpdate=true;
+  for(let k=0;k<48;k++){const vis=k<Math.min(S.inStage,CFG.cap);mm4.compose(new THREE.Vector3(X(44)+.8+(k%12)*2.25,FLOOR_Y+.7,Z(452)+.6+Math.floor(k/12)*1.75),Q0,vis?new THREE.Vector3(1.7,1.3,1.3):new THREE.Vector3(0,0,0));G.inP.setMatrixAt(k,mm4)}
+  for(let k=0;k<64;k++){const vis=k<S.outStage;mm4.compose(new THREE.Vector3(X(604)+.8+(k%16)*2.3,FLOOR_Y+.7,Z(452)+.6+Math.floor(k/16)*1.75),Q0,vis?new THREE.Vector3(1.7,1.3,1.3):new THREE.Vector3(0,0,0));G.outP.setMatrixAt(k,mm4)}
+  G.inP.instanceMatrix.needsUpdate=G.outP.instanceMatrix.needsUpdate=true;
+  const full=S.inStage>=CFG.cap*.9;G.zoneIn.children.forEach(c=>{c.material=M(full?0xEE6A5C:0x7f8a98,{emissive:full?0xEE6A5C:0x7f8a98,emissiveIntensity:full?.9:.35})});
+  AISLES.forEach(a=>{const o=G.aisles[a.id];o.cong.material.opacity=a.spill?.32:Math.min(.25,a.cong*.25);o.avoid.visible=!!a.avoidUntil;o.spill.visible=a.spill});
+  S.docks.forEach(d=>{const t=d.truck,o=G.doors[d.id];let col=0x3a4048,int=.6;
+    if(d.dir==='in'&&doorIdx(d)>=CFG.inDoors&&!t){col=0x8a2a24;int=1}
+    else if(t){if(t.status==='stalled'||(t.dir==='out'&&t.status==='waiting'))col=0xEE6A5C;else if(t.status==='unloading'||t.status==='loading')col=0x45C483;else col=0xF2B33D;int=2.4}
+    o.light.material.emissive.setHex(col);o.light.material.emissiveIntensity=int;o.glow.material.color.setHex(col);o.glow.material.opacity=int>1?.7:.15});
+  // near-wall cutaway
+  const c=G.cam,vx=Math.sin(c.az),vz=Math.cos(c.az);
+  G.walls.forEach(w=>{const near=(w.userData.n[0]*vx+w.userData.n[1]*vz)>.15;const op=G.roofOn?1:(near?.1:1);w.material.opacity=op;w.material.depthWrite=op>.5;w.castShadow=op>.5});
+  // highlights
+  const pulse=.55+.45*Math.sin(now/180);let ri=0;
+  const ids=new Set();if(S.hl&&now<S.hl.until)S.hl.ids.forEach(i=>ids.add(i));if(S.sel&&now<S.selUntil)ids.add(S.sel);
+  Object.entries(G.zp).forEach(([k,p])=>{const id={IN:'IN-STAGE',OUT:'OUT-STAGE',YARD:'YARD',CHG:'CHG'}[k];p.material.opacity=ids.has(id)?.18+.14*pulse:0;p.material.color.setHex(S.sel===id&&!isHL(id)?0x5B93F5:0xF2B33D)});
+  AISLES.forEach(a=>{const p=G.aisles[a.id].hit,id='AISLE-'+a.id;p.material.opacity=ids.has(id)?.16+.14*pulse:0;p.material.color.setHex(S.sel===id&&!isHL(id)?0x5B93F5:0xF2B33D)});
+  G.rings.forEach(r=>r.visible=false);
+  ids.forEach(id=>{const p=entityPos(id);if(!p||!p.r||ri>=G.rings.length)return;const r=G.rings[ri++];r.visible=true;r.position.set(p.x,.35,p.z);r.scale.set(p.r,p.r,p.r);r.material.color.setHex(S.sel===id&&!isHL(id)?0x5B93F5:0xF2B33D);r.material.opacity=.45+.5*pulse});
+}
+/* ---- labels ---- */
+const labelEls=new Map();
+function updateLabels(){
+  if(!G.ok)return;const specs=[];const v3=new THREE.Vector3();
+  const hl=id=>isHL(id),sel=id=>S.sel===id;
+  S.docks.forEach(d=>specs.push({k:'door'+d.id,cls:'door'+(d.dir==='in'&&doorIdx(d)>=CFG.inDoors?' closed':''),html:d.id,p:[doorX(d.id),7.6,21.4]}));
+  G.vis.forEach((v,id)=>{const t=v.tr;let show=hl(id)||sel(id)||(v.moving&&v.rev)||t.status==='stalled'||G.cam.zoom>=1.6;if(!show)return;
+    let txt,cls='';
+    if(v.key.startsWith('door:')&&v.moving)txt='<i></i>'+esc(id.replace('-',' '))+' <span>backing in to '+t.dock+'</span>';
+    else if(v.key==='exit')txt='<i></i>'+esc(id.replace('-',' '))+' <span>pulling out</span>';
+    else if(t.status==='yard')txt='<i></i>'+esc(id.replace('-',' '))+' <span>yard, '+Math.round(S.t-t.arrivedAt)+' min</span>';
+    else if(t.dir==='in')txt='<i></i>'+esc(id.replace('-',' '))+' <span>'+t.done+'/'+t.pallets+' pallets'+(t.status==='stalled'?', stalled':'')+'</span>';
+    else txt='<i></i>'+esc(id.replace('-',' '))+' <span>'+t.loaded+'/'+t.needed+' loaded</span>';
+    cls=t.status==='stalled'||t.status==='waiting'?'bad':t.status==='yard'?'warn':(t.status==='unloading'||t.status==='loading')?'ok':'';
+    if(sel(id))cls+=' sel';if(hl(id))cls+=' hl';
+    specs.push({k:'t'+id,cls,html:txt,p:[v.pos.x+Math.sin(v.ang)*7,6.4,v.pos.z+Math.cos(v.ang)*7]})});
+  S.fl.forEach(f=>{if(!(hl(f.id)||sel(f.id)||f.down))return;specs.push({k:'f'+f.id,cls:(f.down?'bad':'ok')+(sel(f.id)?' sel':'')+(hl(f.id)?' hl':''),html:'<i></i>'+f.id+' <span>'+(f.down?'battery fault':f.role==='put'?'putaway':'picking')+'</span>',p:[X(f.x),3.6,Z(f.y)]})});
+  const keep=new Set();const box=$('#labels');
+  specs.forEach(s=>{keep.add(s.k);let el=labelEls.get(s.k);if(!el){el=document.createElement('div');box.appendChild(el);labelEls.set(s.k,el)}
+    if(el._h!==s.html){el.innerHTML=s.html;el._h=s.html}const c='lbl '+s.cls;if(el.className!==c)el.className=c;
+    v3.set(...s.p).project(G.camera);const x=(v3.x+1)/2*G.w,y=(1-v3.y)/2*G.h;el.style.left=x.toFixed(1)+'px';el.style.top=y.toFixed(1)+'px';el.style.display=(x<-50||x>G.w+50||y<-30||y>G.h+30)?'none':''});
+  labelEls.forEach((el,k)=>{if(!keep.has(k)){el.remove();labelEls.delete(k)}});
+}
+
+/* ================= panels ================= */
+function questionFor(id){
+  if(/^FL-/.test(id))return'What is '+id+' doing?';
+  if(/^AISLE-/.test(id))return'What is happening in aisle '+id.slice(6)+'?';
+  if(id==='IN-STAGE')return'Why is inbound staging filling up?';
+  if(id==='OUT-STAGE')return'Which outbound trucks will miss cutoff?';
+  if(id==='YARD')return'Who is waiting in the yard and why?';
+  if(id==='CHG')return'Which forklifts are out of service?';
+  if(/^D\d$/.test(id))return'What is going on at dock '+id+'?';
+  const t=findTruck(id);return t&&t.ship?'Why is shipment #'+t.ship.slice(4)+' where it is?':'Will '+id+' make its cutoff?';
+}
+function select(id){focusOn([id]);S.sel=id;S.selUntil=performance.now()+8000;$('#q').value=questionFor(id);$('#q').focus({preventScroll:true})}
+function kpiData(){
+  const moves=S.events.filter(e=>e.t>S.t-60).length,span=Math.min(60,S.t-480)||1;
+  const q=yardQueue(),maxW=q.length?Math.max(...q.map(t=>S.t-t.arrivedAt)):0;
+  const active=S.docks.filter(d=>d.truck&&(d.truck.status==='unloading'||d.truck.status==='loading')).length;
+  const risk=S.docks.filter(d=>d.dir==='out'&&d.truck&&d.truck.status!=='departing'&&d.truck.status!=='docking'&&outProjection(d.truck)>d.truck.cutoff).length;
+  const util=S.fl.length?S.fl.reduce((s,f)=>s+f.busyE,0)/S.fl.length:0;
+  return{palletMovesPerHour:Math.round(moves*60/span),dockUtilPct:Math.round(active/8*100),inboundStagingPct:Math.round(S.inStage/CFG.cap*100),forkliftUtilPct:Math.round(util*100),outboundAtRisk:risk,yardQueue:q.length,longestYardWaitMin:Math.round(maxW),palletsReceived:S.received};
+}
+function renderKpis(){
+  const k=kpiData();
+  const items=[[k.palletMovesPerHour,'pallet moves / hr',false],[k.dockUtilPct+'%','doors actively working',k.dockUtilPct<60],[k.inboundStagingPct+'%','inbound staging full',k.inboundStagingPct>=85],[k.forkliftUtilPct+'%','forklift utilization',false],[k.outboundAtRisk,'outbound at cutoff risk',k.outboundAtRisk>0],[k.yardQueue+(k.yardQueue?' · '+k.longestYardWaitMin+'m':''),'yard queue, longest wait',k.longestYardWaitMin>25]];
+  $('#kpis').innerHTML=items.map(([v,l,w])=>'<div class="kpi'+(w?' warn':'')+'"><b>'+v+'</b><span>'+l+'</span></div>').join('');
+}
+let watchSig='';
+function renderWatch(){
+  const F=diagnose().slice(0,3);const sig=F.map(f=>f.key+f.title+f.sub).join('|');if(sig===watchSig)return;watchSig=sig;
+  $('#watch').innerHTML=F.length?F.map(f=>'<li><button class="s'+f.sev+'" data-q="'+esc(f.q)+'"><strong>'+esc(f.title)+'</strong><span>'+esc(f.sub)+'</span></button></li>').join(''):'<li class="empty">No abnormal constraints. Inject a disruption to see the copilot work.</li>';
+}
+$('#watch').addEventListener('click',e=>{const b=e.target.closest('button[data-q]');if(b)ask(b.dataset.q)});
+function renderLog(){if(!logDirty)return;logDirty=false;$('#log').innerHTML=S.log.slice(0,30).map(l=>'<li class="'+l.kind+'"><time>'+fmt(l.t)+'</time><span>'+esc(l.msg)+'</span></li>').join('')}
+
+/* ================= loop ================= */
+let last=performance.now(),acc=0;
+function frame(now){
+  const dtR=Math.min(.1,(now-last)/1000);last=now;const dt=dtR*S.speed;
+  if(dt>0){
+    const steps=Math.ceil(dt/.5),h=dt/steps;
+    for(let i=0;i<steps;i++){S.t+=h;AISLES.forEach(a=>{const n=S.fl.filter(f=>aisleOf(f)===a).length;a.cong=a.spill?1:Math.max(0,(n-1)*.4)});
+      S.fl.forEach(f=>{stepFl(f,h);const b=(f.state==='travel'||f.state==='handling')&&!f.down?1:0;f.busyE+=(b-f.busyE)*Math.min(1,h*.05)});stepDocks(h)}
+    if(S.events.length>600)S.events=S.events.filter(e=>e.t>S.t-90);
+  }
+  updateTrucks(dtR);
+  const twinVisible=!$('#tab-twin').hidden;
+  if(G.ok&&twinVisible){
+    if(G.camT){const c=G.cam,T=G.camT,k=Math.min(1,dtR*5);let done=true;['az','el','zoom','tx','tz'].forEach(p=>{if(T[p]==null)return;c[p]+=(T[p]-c[p])*k;if(Math.abs(T[p]-c[p])>.002)done=false;else c[p]=T[p]});if(done)G.camT=null;updateCam()}
+    updateForklifts(now);updateFloor(now);G.r.render(G.scene,G.camera);updateLabels();
+  }
+  acc+=dtR;if(acc>.4){acc=0;$('#clock').firstChild.nodeValue=fmt(S.t);renderKpis();renderWatch();renderLog();if(S.sel&&performance.now()>S.selUntil)S.sel=null}
+  requestAnimationFrame(frame);
+}
+
+/* ================= controls ================= */
+function setSpeed(s){S.speed=s;$$('#speed button').forEach(x=>x.setAttribute('aria-pressed',+x.dataset.s===s));$('#simstate').textContent=s?'sim time':'paused'}
+$('#speed').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setSpeed(+b.dataset.s)});
+$$('.inject[data-scen]').forEach(b=>b.addEventListener('click',()=>runScen(b.dataset.scen)));
+function runScen(k){if(S.scen.has(k))return;S.scen.add(k);SCEN[k]();$('.inject[data-scen="'+k+'"]').dataset.on='true';watchSig=''}
+$('#reset').addEventListener('click',()=>{const sp=S.speed;G.vis.forEach(v=>G.scene&&G.scene.remove(v.mesh));G.vis.clear();G.fls.forEach(m=>G.scene&&G.scene.remove(m));G.fls.clear();
+  init();setSpeed(sp);chatEl.innerHTML='';convo.length=0;watchSig='';logDirty=true;greet()});
+function showTab(t){$$('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));$('#tab-twin').hidden=t!=='twin';$('#tab-paper').hidden=t!=='paper';if(t==='paper')renderMermaid();else resize();window.scrollTo(0,0)}
+$$('.tabs button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+document.addEventListener('click',e=>{const b=e.target.closest('.runbtn');if(!b)return;const k=b.dataset.run;showTab('twin');runScen(k);
+  const yq=yardQueue()[0];const q={surge:'What will break first if we keep the current plan?',aisle:'What is happening in aisle C?',fault:'Why is shipment #'+(yq?yq.ship.slice(4):'78466')+' delayed?'}[k];setTimeout(()=>ask(q),k==='fault'?2500:1200)});
+document.addEventListener('click',async e=>{if(e.target.id!=='copypost')return;const t=$('#post').innerText;try{await navigator.clipboard.writeText(t);e.target.textContent='Copied'}catch(err){const r=document.createRange();r.selectNodeContents($('#post'));const s=getSelection();s.removeAllRanges();s.addRange(r);e.target.textContent='Selected, press Ctrl+C'}});
+let mermaidDone=false;
+function renderMermaid(){if(mermaidDone||!window.mermaid)return;mermaidDone=true;try{const dark=matchMedia('(prefers-color-scheme: dark)').matches;mermaid.initialize({startOnLoad:false,theme:dark?'dark':'neutral',fontFamily:'IBM Plex Sans, sans-serif',flowchart:{curve:'basis'}});mermaid.run({querySelector:'.mermaid'})}catch(e){}}
+function greet(){addMsg('ai',richText('The 3D twin of DC-01 is live. Ask me anything about the docks, yard or floor, or tap an issue under **Watching now**. Tap any truck, door, aisle or forklift in the scene to prefill a question.'))}
+
+init();init3D();greet();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
